@@ -20,6 +20,7 @@ import {
   getFeaturedGalleryImages,
   getAnnouncements,
 } from "@/lib/db";
+import HimalayanHeroCanvas from "@/components/HimalayanHeroCanvas";
 
 export const revalidate = 60;
 
@@ -36,103 +37,88 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-20 sm:space-y-28 lg:space-y-32 pb-24 overflow-x-hidden">
-      {/* 1. TYPOGRAPHY-FIRST FULL-WIDTH HERO SECTION */}
-      <section className="relative pt-6 sm:pt-14 lg:pt-20 pb-12 sm:pb-20 overflow-hidden">
-        {/* Subtle Minimalist Himalayan Contour Graphic in Background */}
-        <div
-          className="absolute inset-0 overflow-hidden pointer-events-none -z-10 select-none"
-          aria-hidden="true"
-        >
-          <svg
-            className="absolute right-0 bottom-0 w-full max-w-6xl h-64 sm:h-80 lg:h-96 opacity-[0.05] text-[#0B3D2E]"
-            viewBox="0 0 1000 360"
-            fill="none"
-            preserveAspectRatio="none"
-          >
-            <path
-              d="M0,320 L140,210 L270,265 L410,155 L550,235 L690,120 L840,205 L1000,145 L1000,360 L0,360 Z"
-              fill="currentColor"
-            />
-            <path
-              d="M40,330 L190,195 L330,245 L480,135 L620,215 L760,105 L910,185 L1000,150"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            />
-          </svg>
-        </div>
+      {/* 1. TYPOGRAPHY-FIRST FULL-WIDTH HERO SECTION WITH HIMALAYAN CANVAS */}
+      <section className="relative pt-6 sm:pt-12 lg:pt-16 pb-12 sm:pb-20 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+            {/* Left Column: ~58% width on desktop */}
+            <div className="lg:col-span-7 space-y-6 sm:space-y-7 animate-fade-rise">
+              {/* Small Identity Label */}
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-[#0B3D2E] text-xs font-bold uppercase tracking-widest shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-[#16A05D] animate-ping" />
+                <span>Two Nations. One Community.</span>
+              </div>
 
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="space-y-6 sm:space-y-7 animate-fade-rise">
-            {/* Small Identity Label */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-[#0B3D2E] text-xs font-bold uppercase tracking-widest shadow-2xs">
-              <span className="w-2 h-2 rounded-full bg-[#16A05D] animate-ping" />
-              <span>Two Nations. One Community.</span>
-            </div>
-
-            {/* Expressive Typographic Wordmark: NEPALI in KIIT */}
-            <div className="pt-1 pb-2">
-              <div
-                className="hero-wordmark font-black tracking-tight font-display select-none inline-flex flex-wrap items-baseline gap-x-2.5 sm:gap-x-4 md:gap-x-5"
-                aria-label="NEPALI in KIIT"
-              >
-                <span className="text-[#0B3D2E] uppercase font-black tracking-tighter">
-                  NEPALI
-                </span>
-                <span
-                  className="hero-cursive-in text-[#DC143C] font-normal tracking-normal lowercase px-1.5 sm:px-2.5 animate-script-reveal"
-                  aria-hidden="true"
+              {/* Expressive Typographic Wordmark: NEPALI in KIIT */}
+              <div className="pt-1 pb-2">
+                <div
+                  className="hero-wordmark font-black tracking-tight font-display select-none inline-flex flex-wrap items-baseline gap-x-2.5 sm:gap-x-4 md:gap-x-5"
+                  aria-label="NEPALI in KIIT"
                 >
-                  in
-                </span>
-                <span className="text-[#142B4A] uppercase font-black tracking-tight">
-                  KIIT
-                </span>
+                  <span className="text-[#0B3D2E] uppercase font-black tracking-tighter">
+                    NEPALI
+                  </span>
+                  <span
+                    className="hero-cursive-in text-[#DC143C] font-normal tracking-normal lowercase px-1.5 sm:px-2.5 animate-script-reveal"
+                    aria-hidden="true"
+                  >
+                    in
+                  </span>
+                  <span className="text-[#142B4A] uppercase font-black tracking-tight">
+                    KIIT
+                  </span>
+                </div>
+              </div>
+
+              {/* Headline with Balanced Colors & Clean Crimson Accent Line */}
+              <div className="space-y-3.5 max-w-2xl">
+                <h1 className="hero-headline font-extrabold text-[#17231B] font-display tracking-tight">
+                  <span>Far from home. </span>
+                  <span className="text-[#0B3D2E]">Never far from </span>
+                  <span className="text-[#142B4A]">each other.</span>
+                </h1>
+
+                {/* Subtle refined crimson accent bar */}
+                <div
+                  className="h-1 sm:h-1.5 w-24 sm:w-28 bg-gradient-to-r from-[#DC143C] to-[#DC143C]/40 rounded-full"
+                  aria-hidden="true"
+                />
+              </div>
+
+              {/* Supporting Description */}
+              <p className="text-base sm:text-lg text-gray-700 leading-relaxed max-w-2xl font-normal">
+                {settings.hero_description ||
+                  "NEPALI IN KIIT brings Nepali students together through culture, friendship, shared experiences, and an enduring sense of belonging at KIIT University, Bhubaneswar."}
+              </p>
+
+              {/* Inclusive Community Statement */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF8ED] border-l-4 border-[#0B3D2E] text-xs sm:text-sm text-[#17231B]/90 font-medium max-w-xl shadow-xs leading-relaxed">
+                “Every Nepali in KIIT belongs here. Whether you participate in every event or simply want to connect with familiar roots, you are family.”
+              </div>
+
+              {/* Action Buttons (Accessible, min 48px touch target) */}
+              <div className="flex flex-wrap items-center gap-4 pt-2 sm:pt-3">
+                <Link
+                  href="/join"
+                  className="min-h-[48px] px-7 py-3.5 rounded-xl bg-[#0B3D2E] hover:bg-[#07261D] text-white font-semibold text-sm transition-all flex items-center justify-center gap-2 shadow-xs hover:shadow-md active:scale-95 focus:ring-2 focus:ring-[#0B3D2E] focus:outline-none"
+                >
+                  <span>Explore Our Community</span>
+                  <ArrowRight className="w-4 h-4 text-emerald-300" />
+                </Link>
+
+                <Link
+                  href="/events"
+                  className="min-h-[48px] px-6 py-3.5 rounded-xl bg-gray-100 hover:bg-gray-200/80 text-gray-800 font-semibold text-sm transition-all flex items-center justify-center gap-2 active:scale-95 border border-gray-200/60 focus:ring-2 focus:ring-gray-400 focus:outline-none"
+                >
+                  <span>Discover Events</span>
+                  <Calendar className="w-4 h-4 text-gray-600" />
+                </Link>
               </div>
             </div>
 
-            {/* Headline with Balanced Colors & Clean Crimson Accent Line */}
-            <div className="space-y-3.5 max-w-4xl">
-              <h1 className="hero-headline font-extrabold text-[#17231B] font-display tracking-tight">
-                <span>Far from home. </span>
-                <span className="text-[#0B3D2E]">Never far from </span>
-                <span className="text-[#142B4A]">each other.</span>
-              </h1>
-
-              {/* Subtle refined crimson accent bar */}
-              <div
-                className="h-1 sm:h-1.5 w-24 sm:w-28 bg-gradient-to-r from-[#DC143C] to-[#DC143C]/40 rounded-full"
-                aria-hidden="true"
-              />
-            </div>
-
-            {/* Supporting Description */}
-            <p className="text-base sm:text-lg lg:text-xl text-gray-700 leading-relaxed max-w-3xl font-normal">
-              {settings.hero_description ||
-                "NEPALI IN KIIT brings Nepali students together through culture, friendship, shared experiences, and an enduring sense of belonging at KIIT University, Bhubaneswar."}
-            </p>
-
-            {/* Inclusive Community Statement */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF8ED] border-l-4 border-[#0B3D2E] text-xs sm:text-sm text-[#17231B]/90 font-medium max-w-2xl shadow-xs leading-relaxed">
-              “Every Nepali in KIIT belongs here. Whether you participate in every event or simply want to connect with familiar roots, you are family.”
-            </div>
-
-            {/* Action Buttons (Accessible, min 48px touch target) */}
-            <div className="flex flex-wrap items-center gap-4 pt-3 sm:pt-4">
-              <Link
-                href="/join"
-                className="min-h-[48px] px-7 py-3.5 rounded-xl bg-[#0B3D2E] hover:bg-[#07261D] text-white font-semibold text-sm transition-all flex items-center justify-center gap-2 shadow-xs hover:shadow-md active:scale-95 focus:ring-2 focus:ring-[#0B3D2E] focus:outline-none"
-              >
-                <span>Explore Our Community</span>
-                <ArrowRight className="w-4 h-4 text-emerald-300" />
-              </Link>
-
-              <Link
-                href="/events"
-                className="min-h-[48px] px-6 py-3.5 rounded-xl bg-gray-100 hover:bg-gray-200/80 text-gray-800 font-semibold text-sm transition-all flex items-center justify-center gap-2 active:scale-95 border border-gray-200/60 focus:ring-2 focus:ring-gray-400 focus:outline-none"
-              >
-                <span>Discover Events</span>
-                <Calendar className="w-4 h-4 text-gray-600" />
-              </Link>
+            {/* Right Column: ~42% width on desktop, stacked naturally below on mobile */}
+            <div className="lg:col-span-5 w-full pt-4 lg:pt-0">
+              <HimalayanHeroCanvas />
             </div>
           </div>
         </div>

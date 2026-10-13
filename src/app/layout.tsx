@@ -78,6 +78,8 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
+      suppressHydrationWarning
       className={`${fontSans.variable} ${fontDisplay.variable} ${fontSerif.variable} ${fontScript.variable} h-full scroll-smooth antialiased`}
     >
       <body className="min-h-full flex flex-col bg-white text-[#17231B] selection:bg-[#0B3D2E] selection:text-white">

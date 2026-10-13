@@ -1,7 +1,7 @@
-import Image from "next/image";
 import Link from "next/link";
 import { Users, Heart, Sparkles, Compass, ArrowRight, ShieldCheck } from "lucide-react";
 import { getPageContent, getCommunityProfiles } from "@/lib/db";
+import StoryTypographicPanel from "@/components/StoryTypographicPanel";
 
 export const metadata = {
   title: "About NIK — Our Story & Shared Purpose",
@@ -36,31 +36,11 @@ export default async function AboutPage() {
         </div>
       </section>
 
-      {/* 2. Authentic Photo & Story Section */}
+      {/* 2. Typographic Story Panel & Narrative Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
-          <div className="lg:col-span-5 relative group">
-            <div className="relative rounded-3xl overflow-hidden shadow-xl border border-gray-200/90 bg-gray-900 h-96 sm:h-[480px]">
-              <Image
-                src="/images/community/dashain-together.png"
-                alt="Nepali students celebrating Grand Dashain together, sharing blessings and festive warmth far from home at KIIT University"
-                fill
-                priority
-                className="object-cover group-hover:scale-[1.02] transition-transform duration-700 ease-out"
-                sizes="(max-width: 1024px) 100vw, 42vw"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent pointer-events-none" />
-            </div>
-
-            {/* Floating community attribution card */}
-            <div className="absolute -bottom-5 -right-3 sm:-right-5 bg-white/95 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-gray-200 shadow-xl max-w-xs transition-transform duration-300 group-hover:-translate-y-1">
-              <span className="text-[10px] font-bold text-[#0B3D2E] uppercase tracking-widest block">
-                Two Nations. One Community.
-              </span>
-              <p className="text-xs text-gray-600 mt-1 leading-relaxed">
-                Celebrating Nepali cultural warmth and authentic festival traditions alongside KIIT University campus life.
-              </p>
-            </div>
+          <div className="lg:col-span-5 relative">
+            <StoryTypographicPanel />
           </div>
 
           <div className="lg:col-span-7 space-y-6 pt-4 lg:pt-0">
