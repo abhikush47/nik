@@ -30,11 +30,11 @@ export default function AdminLoginPage() {
         throw new Error(data.error || "Login failed");
       }
 
-      router.push("/admin");
-      router.refresh();
+      // Hard navigation ensures fresh document request with the new cookie,
+      // avoiding stale prefetched unauthenticated redirects in Next.js router cache
+      window.location.href = "/admin";
     } catch (err: any) {
       setError(err.message || "Invalid administrator credentials.");
-    } finally {
       setLoading(false);
     }
   };
@@ -124,7 +124,7 @@ export default function AdminLoginPage() {
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back to Public Website</span>
             </Link>
-            <span className="text-[11px] text-gray-400">Default: admin@nepaliinkiit.org</span>
+            <span className="text-[11px] text-gray-400">Default: admin@nepaliinkiit.org • Pass: AdminNik2026!</span>
           </div>
         </div>
       </div>

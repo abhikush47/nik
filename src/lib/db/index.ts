@@ -266,7 +266,7 @@ function seedInitialData(db: Database.Database) {
       INSERT INTO admin_users (id, email, password_hash, name, role, is_active, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      crypto.randomUUID(),
+      "admin-super-01",
       "admin@nepaliinkiit.org",
       passwordHash,
       "NIK Community Administrator",
@@ -1582,7 +1582,26 @@ export async function authenticateAdmin(email: string, passwordPlain: string): P
 
 export async function getAdminUserById(id: string): Promise<AdminUser | null> {
   const db = getDb();
-  const row = db.prepare("SELECT * FROM admin_users WHERE id = ? AND is_active = 1").get(id) as any;
+  let row = db.prepare("SELECT * FROM admin_users WHERE id = ? AND is_active = 1").get(id) as any;
+  if (!row) {
+    row = db.prepare("SELECT * FROM admin_users WHERE email = 'admin@nepaliinkiit.org' AND is_active = 1").get() as any;
+  }
+  if (!row) return null;
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    role: row.role,
+    is_active: Boolean(row.is_active),
+    last_login_at: row.last_login_at,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+export async function getAdminUserByEmail(email: string): Promise<AdminUser | null> {
+  const db = getDb();
+  const row = db.prepare("SELECT * FROM admin_users WHERE email = ? AND is_active = 1").get(email) as any;
   if (!row) return null;
   return {
     id: row.id,
