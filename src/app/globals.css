@@ -21,6 +21,11 @@
   --font-display: var(--font-display);
   --font-sans: var(--font-sans);
   --font-serif: var(--font-serif);
+  --font-script: var(--font-script);
+}
+
+.font-script {
+  font-family: var(--font-script), "Caveat", "Dancing Script", cursive, "Brush Script MT", sans-serif;
 }
 
 :root {
@@ -124,17 +129,52 @@ body {
   animation: subtleFloat 5s ease-in-out infinite;
 }
 
-/* Responsive clamp typography for hero headline */
+/* Responsive clamp typography for hero headline & wordmark */
+.hero-wordmark {
+  font-size: clamp(2.5rem, 8vw, 6.5rem);
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+}
+
+.hero-cursive-in {
+  font-family: var(--font-script), "Caveat", "Dancing Script", cursive, "Brush Script MT", sans-serif;
+  font-size: clamp(3rem, 9.5vw, 7.5rem);
+  line-height: 0.8;
+  display: inline-block;
+  transform: rotate(-6deg);
+  transition: transform 0.3s ease;
+}
+
+.hero-cursive-in:hover {
+  transform: rotate(-3deg) scale(1.05);
+}
+
 .hero-headline {
-  font-size: clamp(2.25rem, 5.5vw, 4.35rem);
-  line-height: 1.08;
+  font-size: clamp(1.75rem, 4.2vw, 3.25rem);
+  line-height: 1.15;
   letter-spacing: -0.025em;
+}
+
+@keyframes scriptReveal {
+  0% {
+    opacity: 0;
+    transform: scale(0.85) rotate(-12deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-6deg);
+  }
+}
+
+.animate-script-reveal {
+  animation: scriptReveal 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-marquee,
   .animate-fade-rise,
-  .animate-subtle-float {
+  .animate-subtle-float,
+  .animate-script-reveal {
     animation: none !important;
     transform: none !important;
   }

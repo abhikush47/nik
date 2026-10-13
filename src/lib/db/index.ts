@@ -957,6 +957,10 @@ export async function updateEvent(id: string, data: Partial<EventItem>): Promise
   const updated = {
     ...existing,
     ...data,
+    registration_deadline:
+      data.registration_deadline !== undefined
+        ? (data.registration_deadline ? String(data.registration_deadline).trim() : null)
+        : existing.registration_deadline,
     featured: data.featured !== undefined ? (data.featured ? 1 : 0) : existing.featured,
     updated_at: new Date().toISOString(),
   };

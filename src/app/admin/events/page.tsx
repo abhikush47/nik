@@ -34,6 +34,7 @@ export default function AdminEventsPage() {
     cover_image: "/images/community/dashain-together.png",
     start_date: "",
     end_date: "",
+    registration_deadline: "",
     venue: "Campus 6 Auditorium, KIIT University",
     category: "Cultural Celebrations" as any,
     registration_url: "/join",
@@ -75,6 +76,7 @@ export default function AdminEventsPage() {
       cover_image: "/images/community/dashain-together.png",
       start_date: tomorrow.toISOString().slice(0, 16),
       end_date: "",
+      registration_deadline: "",
       venue: "Campus 6 Auditorium, KIIT University",
       category: "Cultural Celebrations",
       registration_url: "/join",
@@ -96,6 +98,7 @@ export default function AdminEventsPage() {
       cover_image: item.cover_image,
       start_date: item.start_date.slice(0, 16),
       end_date: item.end_date ? item.end_date.slice(0, 16) : "",
+      registration_deadline: item.registration_deadline ? item.registration_deadline.slice(0, 16) : "",
       venue: item.venue,
       category: item.category,
       registration_url: item.registration_url || "",
@@ -138,12 +141,29 @@ export default function AdminEventsPage() {
     setActionLoading(true);
     setError(null);
 
+    // Validation: Ensure deadline is on or before start_date if both are provided
+    if (formData.registration_deadline && formData.start_date) {
+      const deadlineTime = new Date(formData.registration_deadline).getTime();
+      const startTime = new Date(formData.start_date).getTime();
+      if (deadlineTime > startTime) {
+        setError("Registration deadline cannot fall after the event start date.");
+        setActionLoading(false);
+        return;
+      }
+    }
+
+    const payload = {
+      ...formData,
+      registration_deadline: formData.registration_deadline ? formData.registration_deadline : null,
+      end_date: formData.end_date ? formData.end_date : null,
+    };
+
     try {
       if (editingItem) {
         const res = await fetch(`/api/admin/events/${editingItem.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(payload),
         });
         if (!res.ok) throw new Error("Failed to update event");
         setSuccess("Event updated successfully!");
@@ -151,7 +171,7 @@ export default function AdminEventsPage() {
         const res = await fetch("/api/admin/events", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(payload),
         });
         if (!res.ok) throw new Error("Failed to create event");
         setSuccess("Event created successfully!");
@@ -272,12 +292,20 @@ export default function AdminEventsPage() {
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-500">
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
                       <span>{new Date(event.start_date).toLocaleDateString()}</span>
                       <span>•</span>
                       <span>{event.venue}</span>
                       <span>•</span>
                       <span className="capitalize">{event.category}</span>
+                      {event.registration_deadline && (
+                        <>
+                          <span>•</span>
+                          <span className="text-[#DC143C] font-semibold">
+                            Deadline: {new Date(event.registration_deadline).toLocaleDateString()}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -367,16 +395,42 @@ export default function AdminEventsPage() {
                     required
                     value={formData.start_date}
                     onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-xs"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-xs focus:ring-2 focus:ring-[#0B3D2E] focus:outline-none"
                   />
                 </div>
 
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-bold text-gray-700">
+                      Registration Deadline <span className="text-gray-400 font-normal">(Optional)</span>
+                    </label>
+                    {formData.registration_deadline && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, registration_deadline: "" })}
+                        className="text-[10px] text-red-600 hover:underline font-semibold"
+                        title="Remove registration deadline"
+                      >
+                        Clear deadline
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="datetime-local"
+                    value={formData.registration_deadline}
+                    onChange={(e) => setFormData({ ...formData, registration_deadline: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-xs focus:ring-2 focus:ring-[#0B3D2E] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">Category</label>
                   <select
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-xs bg-white"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-xs bg-white focus:ring-2 focus:ring-[#0B3D2E] focus:outline-none"
                   >
                     <option value="Cultural Celebrations">Cultural Celebrations</option>
                     <option value="Student Gathering">Student Gathering</option>
@@ -384,6 +438,29 @@ export default function AdminEventsPage() {
                     <option value="Academic & Workshops">Academic & Workshops</option>
                     <option value="Community Meetup">Community Meetup</option>
                   </select>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-bold text-gray-700">
+                      End Date & Time <span className="text-gray-400 font-normal">(Optional)</span>
+                    </label>
+                    {formData.end_date && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, end_date: "" })}
+                        className="text-[10px] text-red-600 hover:underline font-semibold"
+                      >
+                        Clear end date
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="datetime-local"
+                    value={formData.end_date}
+                    onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-xs focus:ring-2 focus:ring-[#0B3D2E] focus:outline-none"
+                  />
                 </div>
               </div>
 

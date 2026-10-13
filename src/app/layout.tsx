@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, Inter, DM_Serif_Display } from "next/font/google";
+import { Plus_Jakarta_Sans, Inter, DM_Serif_Display, Caveat } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -22,6 +22,12 @@ const fontDisplay = Plus_Jakarta_Sans({
 const fontSerif = DM_Serif_Display({
   variable: "--font-serif",
   weight: "400",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const fontScript = Caveat({
+  variable: "--font-script",
   subsets: ["latin"],
   display: "swap",
 });
@@ -72,7 +78,7 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      className={`${fontSans.variable} ${fontDisplay.variable} ${fontSerif.variable} h-full scroll-smooth antialiased`}
+      className={`${fontSans.variable} ${fontDisplay.variable} ${fontSerif.variable} ${fontScript.variable} h-full scroll-smooth antialiased`}
     >
       <body className="min-h-full flex flex-col bg-white text-[#17231B] selection:bg-[#0B3D2E] selection:text-white">
         <AnnouncementTicker announcements={announcements} />

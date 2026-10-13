@@ -59,6 +59,28 @@ export default async function EventDetailPage({ params }: EventPageProps) {
   });
 
   const isUpcoming = new Date(event.start_date) >= new Date();
+  const deadlinePassed = event.registration_deadline
+    ? new Date(event.registration_deadline) < new Date()
+    : false;
+  const isRegistrationActive =
+    event.registration_status === "open" && isUpcoming && !deadlinePassed;
+
+  let formattedDeadline: string | null = null;
+  if (event.registration_deadline) {
+    const d = new Date(event.registration_deadline);
+    formattedDeadline = d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    const timeStr = d.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    if (timeStr !== "12:00 AM") {
+      formattedDeadline += ` at ${timeStr}`;
+    }
+  }
 
   return (
     <article className="pb-24">
@@ -82,10 +104,15 @@ export default async function EventDetailPage({ params }: EventPageProps) {
             <span className="text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-100 text-[#0B3D2E]">
               {event.category}
             </span>
-            {event.registration_status === "open" && isUpcoming && (
+            {isRegistrationActive && (
               <span className="text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-green-100 text-green-800 flex items-center gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
                 <span>Registration Open</span>
+              </span>
+            )}
+            {deadlinePassed && isUpcoming && (
+              <span className="text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-amber-100 text-amber-800">
+                Registration Closed
               </span>
             )}
             {!isUpcoming && (
@@ -180,23 +207,22 @@ export default async function EventDetailPage({ params }: EventPageProps) {
             <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-xs space-y-5">
               <h3 className="text-base font-bold text-gray-900">Participation Status</h3>
 
-              {event.registration_status === "open" && isUpcoming ? (
+              {isRegistrationActive ? (
                 <div className="space-y-4">
                   <p className="text-xs text-gray-600 leading-relaxed">
                     Registration is free for all Nepali students at KIIT. Reserve your spot to assist our food and logistics committee.
                   </p>
-                  {event.registration_deadline && (
-                    <p className="text-xs text-[#DC143C] font-semibold">
-                      Deadline:{" "}
-                      {new Date(event.registration_deadline).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </p>
+                  {formattedDeadline ? (
+                    <div className="p-3 rounded-xl bg-rose-50/80 border border-rose-100 flex items-center justify-between text-xs">
+                      <span className="text-gray-600 font-medium">Registration Deadline:</span>
+                      <span className="font-bold text-[#DC143C]">{formattedDeadline}</span>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400 italic">No deadline specified — open until capacity</p>
                   )}
                   <Link
                     href={event.registration_url || "/join"}
-                    className="w-full flex items-center justify-center gap-2 py-3 px-5 rounded-xl bg-[#0B3D2E] hover:bg-[#07261D] text-white font-bold text-sm transition-all shadow-sm"
+                    className="w-full flex items-center justify-center gap-2 py-3 px-5 rounded-xl bg-[#0B3D2E] hover:bg-[#07261D] text-white font-bold text-sm transition-all shadow-sm active:scale-95"
                   >
                     <span>Register for Event</span>
                     <ArrowUpRight className="w-4 h-4 text-emerald-300" />
@@ -204,9 +230,11 @@ export default async function EventDetailPage({ params }: EventPageProps) {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <p className="text-xs text-gray-500 leading-relaxed">
+                  <p className="text-xs text-gray-600 leading-relaxed">
                     {!isUpcoming
                       ? "This event has already concluded. Photographs are archived in the gallery."
+                      : deadlinePassed
+                      ? `Registration is closed. The deadline passed on ${formattedDeadline}.`
                       : "Registrations are currently closed or by direct coordinator invitation."}
                   </p>
                   <Link
