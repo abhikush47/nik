@@ -20,12 +20,22 @@ export const isSupabaseAdminConfigured = Boolean(
 let cachedClient: SupabaseClient | null = null;
 let cachedAdminClient: SupabaseClient | null = null;
 
+function fetchWithTimeout(url: any, opts: any) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), 8000);
+  return fetch(url, {
+    ...opts,
+    signal: controller.signal,
+  }).finally(() => clearTimeout(id));
+}
+
 export function getSupabase(): SupabaseClient | null {
   if (!isSupabaseConfigured) return null;
   if (!cachedClient) {
     try {
       cachedClient = createClient(supabaseUrl!, supabaseAnonKey!, {
         auth: { persistSession: false },
+        global: { fetch: fetchWithTimeout },
       });
     } catch (err) {
       console.error("Failed to initialize Supabase client:", err);
@@ -41,6 +51,7 @@ export function getSupabaseAdmin(): SupabaseClient | null {
     try {
       cachedAdminClient = createClient(supabaseUrl!, supabaseServiceKey!, {
         auth: { persistSession: false },
+        global: { fetch: fetchWithTimeout },
       });
     } catch (err) {
       console.error("Failed to initialize Supabase admin client:", err);

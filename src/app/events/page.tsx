@@ -9,7 +9,7 @@ export const metadata = {
   description: "Browse upcoming and past events hosted by NEPALI IN KIIT: Grand Dashain, musical acoustic nights, freshers orientations, and sports tournaments.",
 };
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export default async function EventsPage() {
   const [events, featuredEvent] = await Promise.all([

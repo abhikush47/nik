@@ -22,7 +22,7 @@ import {
 } from "@/lib/db";
 import HimalayanHeroCanvas from "@/components/HimalayanHeroCanvas";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const [settings, upcomingEvents, galleryImages, announcements] = await Promise.all([

@@ -7,7 +7,7 @@ export const metadata = {
   description: "Official bulletins, festival registrations, hostel advisories, and community notices for Nepali students at KIIT University.",
 };
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export default async function AnnouncementsPage() {
   const announcements = await getAnnouncements({ onlyPublished: true });

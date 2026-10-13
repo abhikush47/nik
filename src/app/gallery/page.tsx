@@ -6,7 +6,7 @@ export const metadata = {
   description: "Browse authentic photographs of Nepali student life, Dashain celebrations, acoustic music showcases, and campus gatherings at KIIT University.",
 };
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export default async function GalleryPage() {
   const [images, categories] = await Promise.all([

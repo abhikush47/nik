@@ -81,17 +81,16 @@ const statementCache = new Map<string, Database.Statement>();
 function getDb(): Database.Database {
   if (!dbInstance) {
     const dbPath = getDatabasePath();
-    const rawDb = new Database(dbPath);
+    const rawDb = new Database(dbPath, { timeout: 5000 });
     try {
-      rawDb.pragma("journal_mode = WAL");
-    } catch {
-      try {
-        rawDb.pragma("journal_mode = DELETE");
-      } catch {
-        // fallback ignored
-      }
-    }
-    rawDb.pragma("foreign_keys = ON");
+      rawDb.pragma("busy_timeout = 5000");
+    } catch {}
+    try {
+      rawDb.pragma("journal_mode = DELETE");
+    } catch {}
+    try {
+      rawDb.pragma("foreign_keys = ON");
+    } catch {}
 
     // Cache prepared statements on dbInstance so Statement destructors (~Statement())
     // are never triggered during worker garbage collection
