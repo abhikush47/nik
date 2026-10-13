@@ -55,22 +55,37 @@ function getDatabasePath(): string {
 }
 
 let dbInstance: Database.Database | null = null;
+const statementCache = new Map<string, Database.Statement>();
 
 function getDb(): Database.Database {
   if (!dbInstance) {
     const dbPath = getDatabasePath();
-    dbInstance = new Database(dbPath);
+    const rawDb = new Database(dbPath);
     try {
-      dbInstance.pragma("journal_mode = WAL");
+      rawDb.pragma("journal_mode = WAL");
     } catch {
       try {
-        dbInstance.pragma("journal_mode = DELETE");
+        rawDb.pragma("journal_mode = DELETE");
       } catch {
         // fallback ignored
       }
     }
-    dbInstance.pragma("foreign_keys = ON");
-    initSchema(dbInstance);
+    rawDb.pragma("foreign_keys = ON");
+
+    // Cache prepared statements on dbInstance to prevent Statement destructors (~Statement())
+    // from crashing during V8 isolate/worker garbage collection
+    const origPrepare = rawDb.prepare.bind(rawDb);
+    (rawDb as any).prepare = (sql: string) => {
+      let stmt = statementCache.get(sql);
+      if (!stmt) {
+        stmt = origPrepare(sql);
+        statementCache.set(sql, stmt);
+      }
+      return stmt;
+    };
+
+    initSchema(rawDb);
+    dbInstance = rawDb;
   }
   return dbInstance;
 }
