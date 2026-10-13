@@ -11,6 +11,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { getEventBySlug } from "@/lib/db";
+import EventPosterSection from "@/components/EventPosterSection";
 
 interface EventPageProps {
   params: Promise<{ slug: string }>;
@@ -185,20 +186,12 @@ export default async function EventDetailPage({ params }: EventPageProps) {
               {event.description}
             </div>
 
-            {/* Poster Preview if available */}
-            {event.poster_image && event.poster_image !== event.cover_image && (
-              <div className="pt-6 space-y-3">
-                <h3 className="text-lg font-bold text-gray-900">Official Event Poster</h3>
-                <div className="relative h-96 max-w-md rounded-2xl overflow-hidden border border-gray-200 bg-gray-100 shadow-sm">
-                  <Image
-                    src={event.poster_image}
-                    alt={`${event.title} poster`}
-                    fill
-                    className="object-cover"
-                    sizes="400px"
-                  />
-                </div>
-              </div>
+            {/* Official Event Poster Section */}
+            {event.poster_image && (
+              <EventPosterSection
+                posterUrl={event.poster_image}
+                eventTitle={event.title}
+              />
             )}
           </div>
 

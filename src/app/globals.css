@@ -187,12 +187,43 @@ body {
   animation: drawTrajectory 1.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Lightbox Fade & Zoom Animations */
+@keyframes lightboxFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes lightboxZoomIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-lightbox-fade {
+  animation: lightboxFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-lightbox-zoom {
+  animation: lightboxZoomIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-marquee,
   .animate-fade-rise,
   .animate-subtle-float,
   .animate-script-reveal,
-  .animate-draw-trajectory {
+  .animate-draw-trajectory,
+  .animate-lightbox-fade,
+  .animate-lightbox-zoom {
     animation: none !important;
     transform: none !important;
   }
