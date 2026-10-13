@@ -1,7 +1,11 @@
-import Image from "next/image";
 import Link from "next/link";
-import { Check, ArrowRight } from "lucide-react";
+import { Check, ArrowRight, Sparkles, Music, Compass } from "lucide-react";
 import { getCommunityProfiles } from "@/lib/db";
+import {
+  CulturalLifeGraphic,
+  ArtsExpressionGraphic,
+  CampusNavigationGraphic,
+} from "@/components/CommunityCardGraphics";
 
 export const metadata = {
   title: "Our Community — Student Life & Collective Belonging",
@@ -31,55 +35,166 @@ export default async function CommunityPage() {
         </div>
       </section>
 
-      {/* 2. Visual Collage & Activities */}
+      {/* 2. Graphic-Led Community Life Panels (Typography & Vector Led) */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-xs p-6 space-y-4">
-            <div className="relative h-48 rounded-xl overflow-hidden bg-gray-100">
-              <Image
-                src="/images/community/campus-celebration.png"
-                alt="Nepali festival campus celebration"
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, 33vw"
-              />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
+          {/* Card 1: Cultural Life */}
+          <div className="bg-white rounded-2xl border border-gray-200/90 shadow-xs hover:shadow-xl hover:border-emerald-400 p-6 sm:p-7 space-y-5 flex flex-col justify-between transition-all duration-300 group">
+            <div className="space-y-4">
+              {/* Top Badge Row */}
+              <div className="flex items-center justify-between">
+                <div className="w-11 h-11 rounded-xl bg-emerald-50 text-[#0B3D2E] border border-emerald-100 flex items-center justify-center font-bold group-hover:scale-105 transition-transform">
+                  <Sparkles className="w-5 h-5 text-[#0B3D2E]" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-50 text-[#0B3D2E] border border-emerald-200/60">
+                  Tradition & Heritage
+                </span>
+              </div>
+
+              {/* Purpose-designed graphic illustration */}
+              <CulturalLifeGraphic />
+
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#087F4F] block">
+                  Festive Celebrations & Identity
+                </span>
+                <h3 className="text-xl font-bold text-gray-900 font-display mt-0.5 group-hover:text-[#0B3D2E] transition-colors">
+                  Cultural Life
+                </h3>
+              </div>
+
+              <div className="h-0.5 w-12 bg-emerald-600/30 rounded-full" />
+
+              <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
+                Every autumn, our Dashain and Deusi-Bhailo gatherings gather hundreds of students for traditional blessings, authentic cuisine, and folk music.
+              </p>
             </div>
-            <h3 className="text-xl font-bold text-gray-900 font-display">Cultural Life</h3>
-            <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
-              Every autumn, our Dashain and Deusi-Bhailo gatherings gather hundreds of students for traditional blessings, authentic cuisine, and folk music.
-            </p>
+
+            <div className="pt-4 border-t border-gray-100 space-y-2">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                Core Highlights
+              </p>
+              <ul className="text-xs text-gray-700 space-y-1.5">
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                  <span>Dashain Tika & Jamara blessings</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                  <span>Deusi-Bhailo festive gatherings</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                  <span>Authentic Nepali cuisine & feasts</span>
+                </li>
+              </ul>
+            </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-xs p-6 space-y-4">
-            <div className="relative h-48 rounded-xl overflow-hidden bg-gray-100">
-              <Image
-                src="/images/community/talent-showcase.png"
-                alt="Nepali music and arts talent showcase"
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, 33vw"
-              />
+          {/* Card 2: Arts & Expression */}
+          <div className="bg-white rounded-2xl border border-gray-200/90 shadow-xs hover:shadow-xl hover:border-rose-400 p-6 sm:p-7 space-y-5 flex flex-col justify-between transition-all duration-300 group">
+            <div className="space-y-4">
+              {/* Top Badge Row */}
+              <div className="flex items-center justify-between">
+                <div className="w-11 h-11 rounded-xl bg-rose-50 text-[#DC143C] border border-rose-100 flex items-center justify-center font-bold group-hover:scale-105 transition-transform">
+                  <Music className="w-5 h-5 text-[#DC143C]" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-rose-50 text-[#DC143C] border border-rose-200/60">
+                  Culture & Arts
+                </span>
+              </div>
+
+              {/* Purpose-designed graphic illustration */}
+              <ArtsExpressionGraphic />
+
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#DC143C] block">
+                  Music, Dance & Creativity
+                </span>
+                <h3 className="text-xl font-bold text-gray-900 font-display mt-0.5 group-hover:text-[#DC143C] transition-colors">
+                  Arts & Expression
+                </h3>
+              </div>
+
+              <div className="h-0.5 w-12 bg-rose-600/30 rounded-full" />
+
+              <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
+                From Sarangi tunes and acoustic guitar open-mics to traditional Newari, Tamang, and Tharu dances, our students showcase the breadth of Nepali creativity.
+              </p>
             </div>
-            <h3 className="text-xl font-bold text-gray-900 font-display">Arts & Expression</h3>
-            <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
-              From Sarangi tunes and acoustic guitar open-mics to traditional Newari, Tamang, and Tharu dances, our students showcase the breadth of Nepali creativity.
-            </p>
+
+            <div className="pt-4 border-t border-gray-100 space-y-2">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                Core Highlights
+              </p>
+              <ul className="text-xs text-gray-700 space-y-1.5">
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#DC143C]" />
+                  <span>Sarangi fusion & acoustic open-mics</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#DC143C]" />
+                  <span>Traditional Newari, Tamang & Tharu dance</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#DC143C]" />
+                  <span>Student stage showcases & talent nights</span>
+                </li>
+              </ul>
+            </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-xs p-6 space-y-4">
-            <div className="relative h-48 rounded-xl overflow-hidden bg-gray-100">
-              <Image
-                src="/images/community/kiit-gate.jpg"
-                alt="KIIT University campus front gate"
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, 33vw"
-              />
+          {/* Card 3: Campus Navigation */}
+          <div className="bg-white rounded-2xl border border-gray-200/90 shadow-xs hover:shadow-xl hover:border-blue-400 p-6 sm:p-7 space-y-5 flex flex-col justify-between transition-all duration-300 group">
+            <div className="space-y-4">
+              {/* Top Badge Row */}
+              <div className="flex items-center justify-between">
+                <div className="w-11 h-11 rounded-xl bg-blue-50 text-[#142B4A] border border-blue-100 flex items-center justify-center font-bold group-hover:scale-105 transition-transform">
+                  <Compass className="w-5 h-5 text-[#142B4A]" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-blue-50 text-[#142B4A] border border-blue-200/60">
+                  Guidance & Transit
+                </span>
+              </div>
+
+              {/* Purpose-designed graphic illustration */}
+              <CampusNavigationGraphic />
+
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#142B4A] block">
+                  Onboarding & Mentorship
+                </span>
+                <h3 className="text-xl font-bold text-gray-900 font-display mt-0.5 group-hover:text-[#142B4A] transition-colors">
+                  Campus Navigation
+                </h3>
+              </div>
+
+              <div className="h-0.5 w-12 bg-blue-600/30 rounded-full" />
+
+              <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
+                Fresher orientations, hostel guides, academic peer tutoring, and city navigation tips help newcomers settle comfortably in Bhubaneswar.
+              </p>
             </div>
-            <h3 className="text-xl font-bold text-gray-900 font-display">Campus Navigation</h3>
-            <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
-              Fresher orientations, hostel guides, academic peer tutoring, and city navigation tips help newcomers settle comfortably in Bhubaneswar.
-            </p>
+
+            <div className="pt-4 border-t border-gray-100 space-y-2">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                Core Highlights
+              </p>
+              <ul className="text-xs text-gray-700 space-y-1.5">
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#142B4A]" />
+                  <span>Freshers orientation & hostel guides</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#142B4A]" />
+                  <span>Academic peer tutoring & notes</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#142B4A]" />
+                  <span>Bhubaneswar city & transit navigation</span>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       </section>
