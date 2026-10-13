@@ -18,20 +18,57 @@ import {
   DashboardMetrics,
 } from "../types";
 
-const DB_DIR = path.join(process.cwd(), "data");
-const DB_PATH = path.join(DB_DIR, "nik.db");
+function getDatabasePath(): string {
+  const localDir = path.join(process.cwd(), "data");
+  let canWriteLocal = false;
+  try {
+    if (!fs.existsSync(localDir)) {
+      fs.mkdirSync(localDir, { recursive: true });
+    }
+    const testFile = path.join(localDir, `.write-test-${process.pid}`);
+    fs.writeFileSync(testFile, "ok");
+    fs.unlinkSync(testFile);
+    canWriteLocal = true;
+  } catch {
+    canWriteLocal = false;
+  }
 
-// Ensure data directory exists
-if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR, { recursive: true });
+  if (canWriteLocal) {
+    return path.join(localDir, "nik.db");
+  }
+
+  // Fallback to /tmp in read-only environments (e.g. Vercel serverless runtime)
+  const tmpDir = path.join("/tmp", "nik-data");
+  try {
+    if (!fs.existsSync(tmpDir)) {
+      fs.mkdirSync(tmpDir, { recursive: true });
+    }
+    const tmpDbPath = path.join(tmpDir, "nik.db");
+    const localDbPath = path.join(localDir, "nik.db");
+    if (!fs.existsSync(tmpDbPath) && fs.existsSync(localDbPath)) {
+      fs.copyFileSync(localDbPath, tmpDbPath);
+    }
+    return tmpDbPath;
+  } catch {
+    return path.join(localDir, "nik.db");
+  }
 }
 
 let dbInstance: Database.Database | null = null;
 
 function getDb(): Database.Database {
   if (!dbInstance) {
-    dbInstance = new Database(DB_PATH);
-    dbInstance.pragma("journal_mode = WAL");
+    const dbPath = getDatabasePath();
+    dbInstance = new Database(dbPath);
+    try {
+      dbInstance.pragma("journal_mode = WAL");
+    } catch {
+      try {
+        dbInstance.pragma("journal_mode = DELETE");
+      } catch {
+        // fallback ignored
+      }
+    }
     dbInstance.pragma("foreign_keys = ON");
     initSchema(dbInstance);
   }

@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
-import Link from "next/link";
 import { getCurrentAdmin } from "@/lib/auth";
 import AdminSidebar from "./AdminSidebar";
+
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Admin CMS Dashboard — NEPALI IN KIIT",
