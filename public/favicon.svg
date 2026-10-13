@@ -1,0 +1,27 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' width='512' height='512'>
+  <defs>
+    <linearGradient id='nikBg' x1='0%' y1='0%' x2='100%' y2='100%'>
+      <stop offset='0%' stop-color='#0B3D2E' />
+      <stop offset='100%' stop-color='#06231A' />
+    </linearGradient>
+    <linearGradient id='nikCrimson' x1='0%' y1='0%' x2='0%' y2='100%'>
+      <stop offset='0%' stop-color='#FF2E55' />
+      <stop offset='100%' stop-color='#DC143C' />
+    </linearGradient>
+  </defs>
+  
+  <!-- Squircle Base -->
+  <rect width='512' height='512' rx='116' fill='url(#nikBg)' />
+  <rect x='2' y='2' width='508' height='508' rx='114' fill='none' stroke='rgba(255, 255, 255, 0.14)' stroke-width='4' />
+  
+  <!-- N -->
+  <path d='M 63,150 H 115 L 161,258 V 150 H 205 V 362 H 153 L 107,254 V 362 H 63 Z' fill='#FFFFFF' />
+
+  <!-- I -->
+  <rect x='233' y='150' width='46' height='212' rx='8' fill='url(#nikCrimson)' />
+
+  <!-- K -->
+  <path d='M 307,150 H 351 V 362 H 307 Z' fill='#FFFFFF' />
+  <polygon points='347,260 401,150 449,150 380,248' fill='#FFFFFF' />
+  <polygon points='376,242 449,362 397,362 347,246' fill='#FFFFFF' />
+</svg>

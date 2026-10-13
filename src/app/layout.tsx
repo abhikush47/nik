@@ -52,13 +52,30 @@ export async function generateMetadata(): Promise<Metadata> {
         type: "website",
       },
       icons: {
-        icon: "/favicon.ico",
+        icon: [
+          { url: "/icon.svg", type: "image/svg+xml" },
+          { url: "/favicon.ico", sizes: "any" },
+        ],
+        apple: [
+          { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+        ],
       },
+      manifest: "/site.webmanifest",
     };
   } catch (e) {
     return {
       title: "NEPALI IN KIIT",
       description: "Nepali Student Community at KIIT University, Bhubaneswar",
+      icons: {
+        icon: [
+          { url: "/icon.svg", type: "image/svg+xml" },
+          { url: "/favicon.ico", sizes: "any" },
+        ],
+        apple: [
+          { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+        ],
+      },
+      manifest: "/site.webmanifest",
     };
   }
 }
