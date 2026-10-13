@@ -348,34 +348,37 @@ Open for solo vocalists, bands, solo/group dancers, and spoken-word artists.`,
     ];
 
     for (const ev of eventsData) {
-      db.prepare(`
-        INSERT INTO events (
-          id, slug, title, summary, description, cover_image, poster_image,
-          start_date, end_date, venue, category, registration_url,
-          registration_deadline, registration_status, featured, status,
-          display_order, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        crypto.randomUUID(),
-        ev.slug,
-        ev.title,
-        ev.summary,
-        ev.description,
-        ev.cover_image,
-        ev.poster_image,
-        ev.start_date,
-        ev.end_date,
-        ev.venue,
-        ev.category,
-        ev.registration_url,
-        ev.registration_deadline,
-        ev.registration_status,
-        ev.featured,
-        ev.status,
-        ev.display_order,
-        now,
-        now
-      );
+      const existing = db.prepare("SELECT id FROM events WHERE slug = ?").get(ev.slug);
+      if (!existing) {
+        db.prepare(`
+          INSERT INTO events (
+            id, slug, title, summary, description, cover_image, poster_image,
+            start_date, end_date, venue, category, registration_url,
+            registration_deadline, registration_status, featured, status,
+            display_order, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          crypto.randomUUID(),
+          ev.slug,
+          ev.title,
+          ev.summary,
+          ev.description,
+          ev.cover_image,
+          ev.poster_image,
+          ev.start_date,
+          ev.end_date,
+          ev.venue,
+          ev.category,
+          ev.registration_url,
+          ev.registration_deadline,
+          ev.registration_status,
+          ev.featured,
+          ev.status,
+          ev.display_order,
+          now,
+          now
+        );
+      }
     }
   }
 
@@ -452,66 +455,66 @@ Open for solo vocalists, bands, solo/group dancers, and spoken-word artists.`,
   }
 
   // 6. Gallery Images seed (Authentic photographs)
-  const galCount = db.prepare("SELECT COUNT(*) as count FROM gallery_images").get() as { count: number };
-  if (galCount.count === 0) {
-    const imagesData = [
-      {
-        title: "Grand Dashain Community Gathering",
-        alt_text: "Nepali students celebrating Dashain together at KIIT with traditional attire and smiles",
-        category_slug: "dashain",
-        image_url: "/images/community/dashain-together.png",
-        photographer_credit: "NIK Media Team",
-        featured: 1,
-        display_order: 1,
-      },
-      {
-        title: "Campus Cultural Festival Experience",
-        alt_text: "Nepali festival cultural showcase and stage performances on campus",
-        category_slug: "cultural-celebrations",
-        image_url: "/images/community/festival-experience.png",
-        photographer_credit: "NIK Media Team",
-        featured: 1,
-        display_order: 2,
-      },
-      {
-        title: "Nepali Heritage Meets KIIT Campus",
-        alt_text: "Nepali students proudly representing heritage on the KIIT University campus grounds",
-        category_slug: "student-life",
-        image_url: "/images/community/heritage-campus.png",
-        photographer_credit: "NIK Photography",
-        featured: 1,
-        display_order: 3,
-      },
-      {
-        title: "Festival Campus Celebration & Unity",
-        alt_text: "Group celebration of Nepali festival traditions in Bhubaneswar",
-        category_slug: "cultural-celebrations",
-        image_url: "/images/community/campus-celebration.png",
-        photographer_credit: "NIK Volunteer",
-        featured: 1,
-        display_order: 4,
-      },
-      {
-        title: "Dashain Talent Showcase & Acoustic Session",
-        alt_text: "Poster and visual memory of Nepali musical talent showcase at KIIT",
-        category_slug: "dashain",
-        image_url: "/images/community/talent-showcase.png",
-        photographer_credit: "NIK Arts Committee",
-        featured: 0,
-        display_order: 5,
-      },
-      {
-        title: "KIIT Campus 6 Front Gate & Landmark",
-        alt_text: "Campus 6 front gate where Nepali students meet and attend daily classes",
-        category_slug: "student-life",
-        image_url: "/images/community/kiit-gate.jpg",
-        photographer_credit: "Campus Photography",
-        featured: 0,
-        display_order: 6,
-      },
-    ];
+  const imagesData = [
+    {
+      title: "Grand Dashain Community Gathering",
+      alt_text: "Nepali students celebrating Dashain together at KIIT with traditional attire and smiles",
+      category_slug: "dashain",
+      image_url: "/images/community/dashain-together.png",
+      photographer_credit: "NIK Media Team",
+      featured: 1,
+      display_order: 1,
+    },
+    {
+      title: "Campus Cultural Festival Experience",
+      alt_text: "Nepali festival cultural showcase and stage performances on campus",
+      category_slug: "cultural-celebrations",
+      image_url: "/images/community/festival-experience.png",
+      photographer_credit: "NIK Media Team",
+      featured: 1,
+      display_order: 2,
+    },
+    {
+      title: "Nepali Heritage Meets KIIT Campus",
+      alt_text: "Nepali students proudly representing heritage on the KIIT University campus grounds",
+      category_slug: "student-life",
+      image_url: "/images/community/heritage-campus.png",
+      photographer_credit: "NIK Photography",
+      featured: 1,
+      display_order: 3,
+    },
+    {
+      title: "Festival Campus Celebration & Unity",
+      alt_text: "Group celebration of Nepali festival traditions in Bhubaneswar",
+      category_slug: "cultural-celebrations",
+      image_url: "/images/community/campus-celebration.png",
+      photographer_credit: "NIK Volunteer",
+      featured: 1,
+      display_order: 4,
+    },
+    {
+      title: "Dashain Talent Showcase & Acoustic Session",
+      alt_text: "Poster and visual memory of Nepali musical talent showcase at KIIT",
+      category_slug: "dashain",
+      image_url: "/images/community/talent-showcase.png",
+      photographer_credit: "NIK Arts Committee",
+      featured: 1,
+      display_order: 5,
+    },
+    {
+      title: "KIIT Campus 6 Front Gate & Landmark",
+      alt_text: "Campus 6 front gate where Nepali students meet and attend daily classes",
+      category_slug: "student-life",
+      image_url: "/images/community/kiit-gate.jpg",
+      photographer_credit: "Campus Photography",
+      featured: 0,
+      display_order: 6,
+    },
+  ];
 
-    for (const img of imagesData) {
+  for (const img of imagesData) {
+    const existing = db.prepare("SELECT id FROM gallery_images WHERE image_url = ?").get(img.image_url);
+    if (!existing) {
       db.prepare(`
         INSERT INTO gallery_images (
           id, title, alt_text, category_slug, image_url,

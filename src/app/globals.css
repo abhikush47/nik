@@ -94,9 +94,55 @@ body {
   animation-play-state: paused;
 }
 
+/* Page Entry Fade & Rise */
+@keyframes fadeRise {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-rise {
+  animation: fadeRise 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Subtle float for delicate decorative cards */
+@keyframes subtleFloat {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-subtle-float {
+  animation: subtleFloat 5s ease-in-out infinite;
+}
+
+/* Responsive clamp typography for hero headline */
+.hero-headline {
+  font-size: clamp(2.25rem, 5.5vw, 4.35rem);
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-marquee {
-    animation: none;
-    transform: none;
+  .animate-marquee,
+  .animate-fade-rise,
+  .animate-subtle-float {
+    animation: none !important;
+    transform: none !important;
+  }
+
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
