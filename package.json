@@ -1,6 +1,6 @@
 {
-  "name": "temp-nik",
-  "version": "0.1.0",
+  "name": "nepali-in-kiit",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,6 +9,13 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
+    "@types/bcryptjs": "^3.0.0",
+    "@types/better-sqlite3": "^9.6.0",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^11.8.1",
+    "framer-motion": "^14.1.0",
+    "lucide-react": "^1.55.0",
     "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"
