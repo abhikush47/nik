@@ -79,7 +79,8 @@ export default function AdminCommunityPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData),
         });
-        if (!res.ok) throw new Error("Failed to update profile");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Failed to update profile");
         setSuccess("Profile updated successfully!");
       } else {
         const res = await fetch("/api/admin/community", {
@@ -87,7 +88,8 @@ export default function AdminCommunityPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData),
         });
-        if (!res.ok) throw new Error("Failed to create profile");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Failed to create profile");
         setSuccess("Profile created successfully!");
       }
       setModalOpen(false);
@@ -101,24 +103,31 @@ export default function AdminCommunityPage() {
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to delete profile "${name}"?`)) return;
+    setError(null);
     try {
-      await fetch(`/api/admin/community/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/community/${id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to delete profile");
+      setSuccess(`Profile "${name}" deleted.`);
       fetchProfiles();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setError(err.message || "Failed to delete profile");
     }
   };
 
   const togglePublished = async (p: CommunityProfile) => {
     try {
-      await fetch(`/api/admin/community/${p.id}`, {
+      setError(null);
+      const res = await fetch(`/api/admin/community/${p.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ is_published: !p.is_published }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to update publish status");
       fetchProfiles();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setError(err.message || "Failed to update publish status");
     }
   };
 

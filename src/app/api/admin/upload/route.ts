@@ -49,17 +49,26 @@ export async function POST(req: NextRequest) {
 
       if (error) {
         console.error("Supabase storage upload error:", error);
-        // fallback to local storage
-      } else if (data) {
+        return NextResponse.json(
+          { error: `Cloud storage upload failed: ${error.message}` },
+          { status: 500 }
+        );
+      }
+
+      if (data) {
         const { data: publicData } = supabaseAdmin.storage
           .from("community-media")
           .getPublicUrl(safeName);
         fileUrl = publicData.publicUrl;
       }
-    }
-
-    // If not using Supabase or fallback needed:
-    if (!fileUrl) {
+    } else {
+      // Local storage fallback for development
+      if (process.env.VERCEL) {
+        return NextResponse.json(
+          { error: "Cloud storage is not configured. Please ensure SUPABASE_SERVICE_ROLE_KEY and NEXT_PUBLIC_SUPABASE_URL are set in Vercel." },
+          { status: 500 }
+        );
+      }
       const uploadDir = path.join(process.cwd(), "public", "uploads");
       if (!fs.existsSync(uploadDir)) {
         fs.mkdirSync(uploadDir, { recursive: true });
@@ -68,6 +77,7 @@ export async function POST(req: NextRequest) {
       fs.writeFileSync(targetPath, buffer);
       fileUrl = `/uploads/${safeName}`;
     }
+
 
     await logAdminActivity(
       admin.email,

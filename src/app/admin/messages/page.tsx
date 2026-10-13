@@ -28,6 +28,7 @@ export default function AdminMessagesPage() {
   const [notes, setNotes] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchMessages = async () => {
     try {
@@ -50,6 +51,7 @@ export default function AdminMessagesPage() {
 
   const handleUpdateStatus = async (id: string, type: "contact" | "join", status: string) => {
     try {
+      setError(null);
       const endpoint =
         type === "contact"
           ? `/api/admin/messages/${id}`
@@ -61,42 +63,48 @@ export default function AdminMessagesPage() {
         body: JSON.stringify({ status }),
       });
 
-      if (res.ok) {
-        fetchMessages();
-        if (selectedMessage && selectedMessage.id === id) {
-          setSelectedMessage((prev: any) => ({ ...prev, status }));
-        }
-        if (selectedJoin && selectedJoin.id === id) {
-          setSelectedJoin((prev: any) => ({ ...prev, status }));
-        }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to update status");
+
+      fetchMessages();
+      if (selectedMessage && selectedMessage.id === id) {
+        setSelectedMessage((prev: any) => ({ ...prev, status }));
       }
-    } catch (err) {
-      console.error(err);
+      if (selectedJoin && selectedJoin.id === id) {
+        setSelectedJoin((prev: any) => ({ ...prev, status }));
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to update status");
     }
   };
 
   const handleSaveNotes = async () => {
     setSavingNotes(true);
+    setError(null);
     try {
       if (selectedMessage) {
-        await fetch(`/api/admin/messages/${selectedMessage.id}`, {
+        const res = await fetch(`/api/admin/messages/${selectedMessage.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ private_notes: notes }),
         });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Failed to save internal notes");
         setSelectedMessage({ ...selectedMessage, private_notes: notes });
       } else if (selectedJoin) {
-        await fetch(`/api/admin/join-requests/${selectedJoin.id}`, {
+        const res = await fetch(`/api/admin/join-requests/${selectedJoin.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ private_notes: notes }),
         });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Failed to save internal notes");
         setSelectedJoin({ ...selectedJoin, private_notes: notes });
       }
       setSuccess("Internal notes saved successfully.");
       fetchMessages();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setError(err.message || "Failed to save internal notes");
     } finally {
       setSavingNotes(false);
     }
@@ -104,6 +112,7 @@ export default function AdminMessagesPage() {
 
   const handleDelete = async (id: string, type: "contact" | "join") => {
     if (!confirm("Are you sure you want to permanently delete this submission?")) return;
+    setError(null);
     try {
       const endpoint =
         type === "contact"
@@ -111,13 +120,15 @@ export default function AdminMessagesPage() {
           : `/api/admin/join-requests/${id}`;
 
       const res = await fetch(endpoint, { method: "DELETE" });
-      if (res.ok) {
-        setSelectedMessage(null);
-        setSelectedJoin(null);
-        fetchMessages();
-      }
-    } catch (err) {
-      console.error(err);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to delete submission");
+
+      setSuccess("Submission permanently deleted.");
+      setSelectedMessage(null);
+      setSelectedJoin(null);
+      fetchMessages();
+    } catch (err: any) {
+      setError(err.message || "Failed to delete submission");
     }
   };
 
@@ -161,6 +172,15 @@ export default function AdminMessagesPage() {
         <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between">
           <span>{success}</span>
           <button onClick={() => setSuccess(null)} className="text-emerald-600 hover:text-emerald-900">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {error && (
+        <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-red-600 hover:text-red-900">
             <X className="w-4 h-4" />
           </button>
         </div>

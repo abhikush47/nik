@@ -44,10 +44,11 @@ export default function AdminSettingsPage() {
         body: JSON.stringify(settings),
       });
 
-      if (!res.ok) throw new Error("Failed to save site settings");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to save site settings");
       setSuccess("Site configuration updated successfully!");
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Failed to save site settings");
     } finally {
       setSaving(false);
     }

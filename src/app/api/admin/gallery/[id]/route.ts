@@ -9,9 +9,15 @@ export async function PUT(
   try {
     const admin = await requireAdmin();
     const { id } = await context.params;
+    if (!id) {
+      return NextResponse.json({ error: "Photograph ID is required" }, { status: 400 });
+    }
     const body = await req.json();
 
     const updated = await updateGalleryImage(id, body);
+    if (!updated) {
+      return NextResponse.json({ error: "Photograph not found" }, { status: 404 });
+    }
 
     await logAdminActivity(
       admin.email,
@@ -24,10 +30,10 @@ export async function PUT(
     return NextResponse.json({ success: true, item: updated });
   } catch (err: any) {
     if (err.message === "UNAUTHORIZED") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized. Please sign in again." }, { status: 401 });
     }
     console.error("Update gallery photo error:", err);
-    return NextResponse.json({ error: "Failed to update gallery photo" }, { status: 500 });
+    return NextResponse.json({ error: err.message || "Failed to update gallery photo" }, { status: 500 });
   }
 }
 
@@ -38,10 +44,13 @@ export async function DELETE(
   try {
     const admin = await requireAdmin();
     const { id } = await context.params;
+    if (!id) {
+      return NextResponse.json({ error: "Photograph ID is required" }, { status: 400 });
+    }
 
     const ok = await deleteGalleryImage(id);
     if (!ok) {
-      return NextResponse.json({ error: "Image not found" }, { status: 404 });
+      return NextResponse.json({ error: "Photograph not found or already deleted" }, { status: 404 });
     }
 
     await logAdminActivity(admin.email, "DELETE", "GALLERY_IMAGE", id, `Deleted gallery photo ID: ${id}`);
@@ -49,9 +58,10 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (err: any) {
     if (err.message === "UNAUTHORIZED") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized. Please sign in again." }, { status: 401 });
     }
     console.error("Delete gallery photo error:", err);
-    return NextResponse.json({ error: "Failed to delete gallery photo" }, { status: 500 });
+    return NextResponse.json({ error: err.message || "Failed to delete gallery photo" }, { status: 500 });
   }
 }
+

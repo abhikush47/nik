@@ -165,7 +165,8 @@ export default function AdminEventsPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        if (!res.ok) throw new Error("Failed to update event");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Failed to update event");
         setSuccess("Event updated successfully!");
       } else {
         const res = await fetch("/api/admin/events", {
@@ -173,7 +174,8 @@ export default function AdminEventsPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        if (!res.ok) throw new Error("Failed to create event");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Failed to create event");
         setSuccess("Event created successfully!");
       }
       setModalOpen(false);
@@ -188,13 +190,15 @@ export default function AdminEventsPage() {
   const handleDelete = async (id: string, title: string) => {
     if (!confirm(`Are you sure you want to delete event "${title}"?`)) return;
     setActionLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/admin/events/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete event");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to delete event");
       setSuccess("Event deleted.");
       await fetchItems();
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Failed to delete event");
     } finally {
       setActionLoading(false);
     }
@@ -202,14 +206,17 @@ export default function AdminEventsPage() {
 
   const toggleFeatured = async (item: EventItem) => {
     try {
+      setError(null);
       const res = await fetch(`/api/admin/events/${item.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ featured: !item.featured }),
       });
-      if (res.ok) fetchItems();
-    } catch (err) {
-      console.error(err);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to update featured status");
+      fetchItems();
+    } catch (err: any) {
+      setError(err.message || "Failed to update featured status");
     }
   };
 

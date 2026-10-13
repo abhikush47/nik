@@ -50,10 +50,11 @@ export default function AdminPagesManager() {
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to save changes");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to save changes");
       setSuccess(`Saved changes for "${item.title}". Changes will appear on public site.`);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Failed to save changes");
     } finally {
       setSavingKey(null);
     }

@@ -101,7 +101,8 @@ export default function AdminAnnouncementsPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData),
         });
-        if (!res.ok) throw new Error("Failed to update announcement");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Failed to update announcement");
         setSuccess("Announcement updated successfully!");
       } else {
         const res = await fetch("/api/admin/announcements", {
@@ -109,7 +110,8 @@ export default function AdminAnnouncementsPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData),
         });
-        if (!res.ok) throw new Error("Failed to create announcement");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Failed to create announcement");
         setSuccess("Announcement created successfully!");
       }
       setModalOpen(false);
@@ -124,13 +126,15 @@ export default function AdminAnnouncementsPage() {
   const handleDelete = async (id: string, title: string) => {
     if (!confirm(`Are you sure you want to delete "${title}"?`)) return;
     setActionLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/admin/announcements/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete announcement");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to delete announcement");
       setSuccess("Announcement deleted.");
       await fetchItems();
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Failed to delete announcement");
     } finally {
       setActionLoading(false);
     }
@@ -138,16 +142,17 @@ export default function AdminAnnouncementsPage() {
 
   const toggleMarquee = async (item: Announcement) => {
     try {
+      setError(null);
       const res = await fetch(`/api/admin/announcements/${item.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ marquee_enabled: !item.marquee_enabled }),
       });
-      if (res.ok) {
-        fetchItems();
-      }
-    } catch (err) {
-      console.error(err);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to update marquee status");
+      fetchItems();
+    } catch (err: any) {
+      setError(err.message || "Failed to update marquee status");
     }
   };
 

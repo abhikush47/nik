@@ -26,6 +26,7 @@ export default function AdminGalleryPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<{ id: string; title: string } | null>(null);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -135,7 +136,8 @@ export default function AdminGalleryPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData),
         });
-        if (!res.ok) throw new Error("Failed to update photograph");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Failed to update photograph");
         setSuccess("Photograph updated successfully!");
       } else {
         const res = await fetch("/api/admin/gallery", {
@@ -143,7 +145,8 @@ export default function AdminGalleryPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData),
         });
-        if (!res.ok) throw new Error("Failed to add photograph");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Failed to add photograph");
         setSuccess("Photograph added to gallery!");
       }
       setModalOpen(false);
@@ -155,16 +158,19 @@ export default function AdminGalleryPage() {
     }
   };
 
-  const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`Are you sure you want to delete photograph "${title}"?`)) return;
+  const executeDelete = async () => {
+    if (!deleteConfirmItem) return;
     setActionLoading(true);
+    setError(null);
     try {
-      const res = await fetch(`/api/admin/gallery/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete photograph");
-      setSuccess("Photograph removed from gallery.");
+      const res = await fetch(`/api/admin/gallery/${deleteConfirmItem.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to delete photograph");
+      setSuccess(`Photograph "${deleteConfirmItem.title}" deleted successfully.`);
+      setDeleteConfirmItem(null);
       await fetchData();
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Failed to delete photograph");
     } finally {
       setActionLoading(false);
     }
@@ -172,16 +178,20 @@ export default function AdminGalleryPage() {
 
   const toggleFeatured = async (item: GalleryImage) => {
     try {
+      setError(null);
       const res = await fetch(`/api/admin/gallery/${item.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ featured: !item.featured }),
       });
-      if (res.ok) fetchData();
-    } catch (err) {
-      console.error(err);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to update featured status");
+      await fetchData();
+    } catch (err: any) {
+      setError(err.message || "Failed to update featured status");
     }
   };
+
 
   return (
     <div className="space-y-6">
@@ -291,8 +301,9 @@ export default function AdminGalleryPage() {
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => handleDelete(img.id, img.title)}
-                        className="p-1.5 text-gray-400 hover:text-red-600 rounded-md hover:bg-red-50"
+                        onClick={() => setDeleteConfirmItem({ id: img.id, title: img.title })}
+                        disabled={actionLoading}
+                        className="p-1.5 text-gray-400 hover:text-red-600 rounded-md hover:bg-red-50 disabled:opacity-50"
                         title="Delete"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -446,6 +457,48 @@ export default function AdminGalleryPage() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-200">
+            <div className="flex items-center gap-3 text-red-600 mb-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900 text-sm">Delete Photograph</h3>
+                <p className="text-xs text-gray-500">This action cannot be undone</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-600 mb-6 leading-relaxed">
+              Are you sure you want to permanently delete{" "}
+              <strong className="text-gray-900 font-semibold">"{deleteConfirmItem.title}"</strong>?
+              The photograph record and its cloud storage file will be removed.
+            </p>
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => setDeleteConfirmItem(null)}
+                className="px-4 py-2 rounded-xl border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={executeDelete}
+                className="px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors flex items-center gap-1.5 disabled:opacity-50 shadow-xs"
+              >
+                {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                <span>Delete Photograph</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
