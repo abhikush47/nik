@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Lock, Mail, Loader2, AlertCircle, ArrowLeft, ShieldCheck } from "lucide-react";
 import Wordmark from "@/components/Wordmark";
 
 export default function AdminLoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -74,7 +72,8 @@ export default function AdminLoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@nepaliinkiit.org"
+                  placeholder="Enter your email"
+                  autoComplete="email"
                   className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 text-sm focus:border-[#0B3D2E] focus:ring-2 focus:ring-[#0B3D2E]/20 transition-all"
                 />
               </div>
@@ -91,7 +90,8 @@ export default function AdminLoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••"
+                  placeholder="Enter your password"
+                  autoComplete="current-password"
                   className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 text-sm focus:border-[#0B3D2E] focus:ring-2 focus:ring-[#0B3D2E]/20 transition-all"
                 />
               </div>
@@ -116,15 +116,14 @@ export default function AdminLoginPage() {
             </button>
           </form>
 
-          <div className="pt-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+          <div className="pt-4 border-t border-gray-100 flex items-center justify-center text-xs text-gray-500">
             <Link
               href="/"
-              className="inline-flex items-center gap-1 hover:text-gray-900 transition-colors"
+              className="inline-flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors font-medium"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back to Public Website</span>
             </Link>
-            <span className="text-[11px] text-gray-400">Default: admin@nepaliinkiit.org • Pass: AdminNik2026!</span>
           </div>
         </div>
       </div>
