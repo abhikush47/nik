@@ -376,6 +376,62 @@ CREATE POLICY "Admins can view activity logs"
   TO authenticated
   USING (true);
 
+-- 9. RESOURCE CATEGORIES & RESOURCES
+CREATE TABLE IF NOT EXISTS resource_categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  slug TEXT UNIQUE NOT NULL,
+  description TEXT,
+  display_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS resources (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT,
+  drive_url TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'Other',
+  resource_type TEXT NOT NULL DEFAULT 'Google Drive Folder' CHECK (resource_type IN (
+    'Google Drive Folder', 'Google Docs', 'Google Sheets', 'Google Slides', 'PDF', 'Video', 'Other'
+  )),
+  cover_image_url TEXT,
+  tags TEXT[] DEFAULT '{}',
+  related_event TEXT,
+  event_date DATE,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('published', 'draft', 'archived')),
+  display_order INTEGER NOT NULL DEFAULT 0,
+  featured BOOLEAN NOT NULL DEFAULT false,
+  created_by TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_resources_status ON resources(status);
+CREATE INDEX IF NOT EXISTS idx_resources_category ON resources(category);
+CREATE INDEX IF NOT EXISTS idx_resources_featured ON resources(featured);
+CREATE INDEX IF NOT EXISTS idx_resources_display_order ON resources(display_order);
+
+DROP TRIGGER IF EXISTS trigger_resources_updated_at ON resources;
+CREATE TRIGGER trigger_resources_updated_at
+BEFORE UPDATE ON resources
+FOR EACH ROW EXECUTE FUNCTION set_updated_at_column();
+
+ALTER TABLE resource_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE resources ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public can view resource categories" ON resource_categories;
+CREATE POLICY "Public can view resource categories" ON resource_categories FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Public can view published resources" ON resources;
+CREATE POLICY "Public can view published resources" ON resources FOR SELECT USING (status = 'published');
+
+DROP POLICY IF EXISTS "Admins have full access to resource_categories" ON resource_categories;
+CREATE POLICY "Admins have full access to resource_categories" ON resource_categories FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Admins have full access to resources" ON resources;
+CREATE POLICY "Admins have full access to resources" ON resources FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
 -- ==============================================================================
 -- STORAGE CONFIGURATION FOR SUPABASE (SQL Reference)
 -- ==============================================================================
@@ -383,3 +439,4 @@ CREATE POLICY "Admins can view activity logs"
 -- create policy "Public Access" on storage.objects for select using (bucket_id = 'community-media');
 -- create policy "Admin Upload" on storage.objects for insert to authenticated with check (bucket_id = 'community-media');
 -- create policy "Admin Delete" on storage.objects for delete to authenticated using (bucket_id = 'community-media');
+

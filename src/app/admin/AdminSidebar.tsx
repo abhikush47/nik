@@ -18,6 +18,7 @@ import {
   Menu,
   X,
   Shield,
+  FolderOpen,
 } from "lucide-react";
 import Wordmark from "@/components/Wordmark";
 import { AdminUser } from "@/lib/types";
@@ -31,6 +32,7 @@ const NAV_ITEMS = [
   { href: "/admin/announcements", label: "Announcements", icon: Megaphone },
   { href: "/admin/events", label: "Events Manager", icon: Calendar },
   { href: "/admin/gallery", label: "Gallery Photos", icon: ImageIcon },
+  { href: "/admin/resources", label: "Resources Hub", icon: FolderOpen },
   { href: "/admin/messages", label: "Inquiries & Requests", icon: MessageSquare },
   { href: "/admin/community", label: "Community Wings", icon: Users },
   { href: "/admin/pages", label: "Page Content", icon: FileText },

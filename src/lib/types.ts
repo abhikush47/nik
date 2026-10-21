@@ -185,4 +185,44 @@ export interface DashboardMetrics {
   activeAnnouncements: number;
   unreadMessages: number;
   pendingJoinRequests: number;
+  totalResources?: number;
+  publishedResources?: number;
 }
+
+export type ResourceType =
+  | "Google Drive Folder"
+  | "Google Docs"
+  | "Google Sheets"
+  | "Google Slides"
+  | "PDF"
+  | "Video"
+  | "Other";
+
+export interface ResourceCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  display_order: number;
+  created_at: string;
+}
+
+export interface ResourceItem {
+  id: string;
+  title: string;
+  description?: string | null;
+  drive_url: string;
+  category: string;
+  resource_type: ResourceType;
+  cover_image_url?: string | null;
+  tags?: string[] | null;
+  related_event?: string | null;
+  event_date?: string | null;
+  status: PublicationStatus;
+  display_order: number;
+  featured: boolean;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+

@@ -223,29 +223,55 @@ export default function AdminGalleryPage() {
     }
 
     setBatchUploading(true);
-    setBatchProgress(`Uploading ${batchFiles.length} photos...`);
     setError(null);
 
+    let successCount = 0;
+    const failedNames: string[] = [];
+
     try {
-      const form = new FormData();
-      batchFiles.forEach((file) => form.append("files", file));
-      form.append("category_slug", batchCategory);
-      form.append("photographer_credit", batchCredit);
-      form.append("title_prefix", batchTitlePrefix);
-      form.append("status", batchStatus);
+      for (let i = 0; i < batchFiles.length; i++) {
+        const file = batchFiles[i];
+        const percent = Math.round(((i) / batchFiles.length) * 100);
+        setBatchProgress(`Uploading ${i + 1} of ${batchFiles.length} (${percent}%): ${file.name}`);
 
-      const res = await fetch("/api/admin/gallery/batch", {
-        method: "POST",
-        body: form,
-      });
+        const form = new FormData();
+        form.append("file", file);
+        form.append("category_slug", batchCategory);
+        form.append("photographer_credit", batchCredit);
+        
+        let customTitle = "";
+        if (batchTitlePrefix.trim()) {
+          customTitle = batchFiles.length > 1 ? `${batchTitlePrefix.trim()} #${i + 1}` : batchTitlePrefix.trim();
+        }
+        form.append("title_prefix", customTitle);
+        form.append("status", batchStatus);
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Batch upload failed");
+        try {
+          const res = await fetch("/api/admin/gallery/batch", {
+            method: "POST",
+            body: form,
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            successCount += data.count || 1;
+          } else {
+            failedNames.push(`${file.name}: ${data.error || "Upload failed"}`);
+          }
+        } catch (uploadErr: any) {
+          failedNames.push(`${file.name}: ${uploadErr.message}`);
+        }
+      }
 
-      setSuccess(`Successfully uploaded ${data.count} photos to "${batchCategory}"!`);
-      setBatchFiles([]);
-      setBatchModalOpen(false);
-      await fetchData();
+      if (successCount > 0) {
+        setSuccess(`Successfully uploaded ${successCount} photo${successCount > 1 ? "s" : ""} to "${batchCategory}"!`);
+        setBatchFiles([]);
+        setBatchModalOpen(false);
+        await fetchData();
+      }
+
+      if (failedNames.length > 0) {
+        setError(`Failed to upload ${failedNames.length} photo(s): ${failedNames.slice(0, 3).join(", ")}${failedNames.length > 3 ? "..." : ""}`);
+      }
     } catch (err: any) {
       setError(err.message || "Failed to batch upload photos");
     } finally {

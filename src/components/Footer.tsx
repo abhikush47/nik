@@ -64,6 +64,11 @@ export default function Footer() {
                   Community Gallery
                 </Link>
               </li>
+              <li>
+                <Link href="/resources" className="hover:text-white transition-colors">
+                  Resources Hub
+                </Link>
+              </li>
             </ul>
           </div>
 

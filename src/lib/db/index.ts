@@ -17,6 +17,8 @@ import {
   JoinRequest,
   AdminActivityLog,
   DashboardMetrics,
+  ResourceItem,
+  ResourceCategory,
 } from "../types";
 
 // ==============================================================================
@@ -270,6 +272,34 @@ function initSQLiteSchema(db: Database.Database) {
       ip_address TEXT,
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS resource_categories (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      slug TEXT UNIQUE NOT NULL,
+      description TEXT,
+      display_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS resources (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT,
+      drive_url TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'Other',
+      resource_type TEXT NOT NULL DEFAULT 'Google Drive Folder',
+      cover_image_url TEXT,
+      tags TEXT DEFAULT '[]',
+      related_event TEXT,
+      event_date TEXT,
+      status TEXT NOT NULL DEFAULT 'draft',
+      display_order INTEGER NOT NULL DEFAULT 0,
+      featured INTEGER NOT NULL DEFAULT 0,
+      created_by TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
   `);
 
   seedSQLiteInitialData(db);
@@ -278,6 +308,16 @@ function initSQLiteSchema(db: Database.Database) {
 // Deterministic seed data constants (Guarantees zero-drift matching across Supabase & SQLite)
 const SEED_ADMIN_ID = "00000000-0000-0000-0000-000000000001";
 const SEED_SETTINGS_ID = "default";
+
+const SEED_RESOURCE_CATEGORIES = [
+  { id: "00000000-0000-0000-0000-000000000031", name: "Event Gallery", slug: "event-gallery", description: "Drive folders with high-resolution event photographs", display_order: 1 },
+  { id: "00000000-0000-0000-0000-000000000032", name: "Documents", slug: "documents", description: "Official community documents, constitutions, and guides", display_order: 2 },
+  { id: "00000000-0000-0000-0000-000000000033", name: "Event Materials", slug: "event-materials", description: "Schedules, itineraries, participant lists, and booklets", display_order: 3 },
+  { id: "00000000-0000-0000-0000-000000000034", name: "Cultural Resources", slug: "cultural-resources", description: "Traditional music, lyrics, folk art, and festival guides", display_order: 4 },
+  { id: "00000000-0000-0000-0000-000000000035", name: "Announcements", slug: "announcements", description: "Official notices, circulars, and executive briefings", display_order: 5 },
+  { id: "00000000-0000-0000-0000-000000000036", name: "Community Resources", slug: "community-resources", description: "Student survival guides, study materials, and campus tips", display_order: 6 },
+  { id: "00000000-0000-0000-0000-000000000037", name: "Other", slug: "other", description: "Miscellaneous shared drives, spreadsheets, and archives", display_order: 7 },
+];
 
 const SEED_CATEGORIES = [
   { id: "00000000-0000-0000-0000-000000000011", name: "Dashain Celebrations", slug: "dashain", description: "Grand Vijaya Dashami festivities, tika ceremonies, and cultural music", display_order: 1 },
@@ -699,6 +739,17 @@ function seedSQLiteInitialData(db: Database.Database) {
         INSERT INTO page_content (key, title, subtitle, content, metadata_json, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
       `).run(c.key, c.title, c.subtitle, c.content, JSON.stringify(c.metadata_json), now);
+    }
+  }
+
+  // 9. Resource Categories seed
+  const resCatCount = db.prepare("SELECT COUNT(*) as count FROM resource_categories").get() as { count: number };
+  if (resCatCount.count === 0) {
+    for (const c of SEED_RESOURCE_CATEGORIES) {
+      db.prepare(`
+        INSERT INTO resource_categories (id, name, slug, description, display_order, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(c.id, c.name, c.slug, c.description, c.display_order, now);
     }
   }
 }
@@ -1634,6 +1685,448 @@ export async function deleteGalleryImage(id: string): Promise<boolean> {
 }
 
 // ==============================================================================
+// 4.5. RESOURCE HUB REPOSITORY
+// ==============================================================================
+
+export async function getResourceCategories(): Promise<ResourceCategory[]> {
+  const supabase = getSupabaseAdmin();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from("resource_categories")
+        .select("*")
+        .order("display_order", { ascending: true });
+      if (!error && data && data.length > 0) {
+        return data;
+      }
+    } catch {
+      // Fallback to SQLite
+    }
+  }
+
+  const db = getDb();
+  const rows = db.prepare("SELECT * FROM resource_categories ORDER BY display_order ASC").all() as ResourceCategory[];
+  if (rows.length === 0) {
+    // Auto-seed in SQLite if empty
+    const now = new Date().toISOString();
+    for (const c of SEED_RESOURCE_CATEGORIES) {
+      db.prepare(`
+        INSERT OR IGNORE INTO resource_categories (id, name, slug, description, display_order, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(c.id, c.name, c.slug, c.description, c.display_order, now);
+    }
+    return db.prepare("SELECT * FROM resource_categories ORDER BY display_order ASC").all() as ResourceCategory[];
+  }
+  return rows;
+}
+
+export async function createResourceCategory(name: string, slug?: string, description?: string): Promise<ResourceCategory> {
+  const finalSlug = (slug || name)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+  const now = new Date().toISOString();
+  const id = crypto.randomUUID();
+
+  const supabase = getSupabaseAdmin();
+  if (supabase) {
+    try {
+      const { data: countData } = await supabase
+        .from("resource_categories")
+        .select("display_order")
+        .order("display_order", { ascending: false })
+        .limit(1);
+      const nextOrder = (countData?.[0]?.display_order || 0) + 1;
+      const { data: created, error } = await supabase
+        .from("resource_categories")
+        .insert({
+          name: name.trim(),
+          slug: finalSlug,
+          description: description ? description.trim() : null,
+          display_order: nextOrder,
+          created_at: now,
+        })
+        .select()
+        .single();
+      if (!error && created) {
+        // Also sync SQLite
+        try {
+          const db = getDb();
+          db.prepare(`
+            INSERT OR REPLACE INTO resource_categories (id, name, slug, description, display_order, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+          `).run(created.id, created.name, created.slug, created.description, created.display_order, now);
+        } catch {}
+        return created;
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO resource_categories (id, name, slug, description, display_order, created_at)
+    VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(display_order), 0) + 1 FROM resource_categories), ?)
+  `).run(id, name.trim(), finalSlug, description ? description.trim() : null, now);
+
+  return {
+    id,
+    name: name.trim(),
+    slug: finalSlug,
+    description: description ? description.trim() : null,
+    display_order: 1,
+    created_at: now,
+  };
+}
+
+export async function deleteResourceCategory(id: string): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
+  if (supabase) {
+    try {
+      await supabase.from("resource_categories").delete().eq("id", id);
+    } catch {}
+  }
+  const db = getDb();
+  const res = db.prepare("DELETE FROM resource_categories WHERE id = ?").run(id);
+  return res.changes > 0;
+}
+
+export async function getResources(options?: {
+  onlyPublished?: boolean;
+  category?: string;
+  search?: string;
+}): Promise<ResourceItem[]> {
+  const supabase = getSupabaseAdmin();
+  if (supabase) {
+    try {
+      let query = supabase.from("resources").select("*");
+      if (options?.onlyPublished) {
+        query = query.eq("status", "published");
+      }
+      if (options?.category && options.category !== "All" && options.category !== "all" && options.category !== "All Resources") {
+        query = query.eq("category", options.category);
+      }
+      query = query
+        .order("display_order", { ascending: true })
+        .order("created_at", { ascending: false });
+
+      const { data, error } = await query;
+      if (!error && data) {
+        let results: ResourceItem[] = data.map((r: any) => ({
+          ...r,
+          featured: Boolean(r.featured),
+          tags: Array.isArray(r.tags)
+            ? r.tags
+            : typeof r.tags === "string"
+            ? JSON.parse(r.tags || "[]")
+            : [],
+        }));
+
+        if (options?.search?.trim()) {
+          const q = options.search.trim().toLowerCase();
+          results = results.filter(
+            (item) =>
+              item.title.toLowerCase().includes(q) ||
+              item.description?.toLowerCase().includes(q) ||
+              item.category.toLowerCase().includes(q) ||
+              item.tags?.some((t) => t.toLowerCase().includes(q))
+          );
+        }
+        return results;
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  const db = getDb();
+  let query = "SELECT * FROM resources";
+  const conditions: string[] = [];
+  const params: any[] = [];
+
+  if (options?.onlyPublished) {
+    conditions.push("status = 'published'");
+  }
+  if (options?.category && options.category !== "All" && options.category !== "all" && options.category !== "All Resources") {
+    conditions.push("category = ?");
+    params.push(options.category);
+  }
+
+  if (conditions.length > 0) {
+    query += " WHERE " + conditions.join(" AND ");
+  }
+
+  query += " ORDER BY display_order ASC, created_at DESC";
+
+  const rows = db.prepare(query).all(...params) as any[];
+  let results: ResourceItem[] = rows.map((r) => ({
+    ...r,
+    featured: Boolean(r.featured),
+    tags: typeof r.tags === "string" ? JSON.parse(r.tags || "[]") : Array.isArray(r.tags) ? r.tags : [],
+  }));
+
+  if (options?.search?.trim()) {
+    const q = options.search.trim().toLowerCase();
+    results = results.filter(
+      (item) =>
+        item.title.toLowerCase().includes(q) ||
+        item.description?.toLowerCase().includes(q) ||
+        item.category.toLowerCase().includes(q) ||
+        item.tags?.some((t) => t.toLowerCase().includes(q))
+    );
+  }
+
+  return results;
+}
+
+export async function getResourceById(id: string): Promise<ResourceItem | null> {
+  const supabase = getSupabaseAdmin();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from("resources").select("*").eq("id", id).maybeSingle();
+      if (!error && data) {
+        return {
+          ...data,
+          featured: Boolean(data.featured),
+          tags: Array.isArray(data.tags)
+            ? data.tags
+            : typeof data.tags === "string"
+            ? JSON.parse(data.tags || "[]")
+            : [],
+        };
+      }
+    } catch {}
+  }
+
+  const db = getDb();
+  const row = db.prepare("SELECT * FROM resources WHERE id = ?").get(id) as any;
+  if (!row) return null;
+  return {
+    ...row,
+    featured: Boolean(row.featured),
+    tags: typeof row.tags === "string" ? JSON.parse(row.tags || "[]") : Array.isArray(row.tags) ? row.tags : [],
+  };
+}
+
+export async function createResource(
+  data: Omit<ResourceItem, "id" | "created_at" | "updated_at">
+): Promise<ResourceItem> {
+  const now = new Date().toISOString();
+  const id = crypto.randomUUID();
+
+  const supabase = getSupabaseAdmin();
+  if (supabase) {
+    try {
+      const { data: created, error } = await supabase
+        .from("resources")
+        .insert({
+          ...data,
+          tags: Array.isArray(data.tags) ? data.tags : [],
+          created_at: now,
+          updated_at: now,
+        })
+        .select()
+        .single();
+
+      if (!error && created) {
+        // Also sync local SQLite
+        try {
+          const db = getDb();
+          db.prepare(`
+            INSERT OR REPLACE INTO resources (
+              id, title, description, drive_url, category, resource_type,
+              cover_image_url, tags, related_event, event_date, status,
+              display_order, featured, created_by, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            created.id,
+            created.title,
+            created.description || null,
+            created.drive_url,
+            created.category,
+            created.resource_type,
+            created.cover_image_url || null,
+            JSON.stringify(created.tags || []),
+            created.related_event || null,
+            created.event_date || null,
+            created.status,
+            created.display_order,
+            created.featured ? 1 : 0,
+            created.created_by || null,
+            now,
+            now
+          );
+        } catch {}
+
+        return {
+          ...created,
+          featured: Boolean(created.featured),
+          tags: Array.isArray(created.tags) ? created.tags : [],
+        };
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO resources (
+      id, title, description, drive_url, category, resource_type,
+      cover_image_url, tags, related_event, event_date, status,
+      display_order, featured, created_by, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    data.title.trim(),
+    data.description ? data.description.trim() : null,
+    data.drive_url.trim(),
+    data.category,
+    data.resource_type,
+    data.cover_image_url || null,
+    JSON.stringify(data.tags || []),
+    data.related_event ? data.related_event.trim() : null,
+    data.event_date || null,
+    data.status,
+    Number(data.display_order) || 0,
+    data.featured ? 1 : 0,
+    data.created_by || null,
+    now,
+    now
+  );
+
+  return {
+    id,
+    ...data,
+    featured: Boolean(data.featured),
+    tags: data.tags || [],
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+export async function updateResource(
+  id: string,
+  data: Partial<Omit<ResourceItem, "id" | "created_at" | "updated_at">>
+): Promise<ResourceItem> {
+  const existing = await getResourceById(id);
+  if (!existing) {
+    throw new Error("Resource not found");
+  }
+
+  const now = new Date().toISOString();
+  const merged: ResourceItem = {
+    ...existing,
+    ...data,
+    updated_at: now,
+  };
+
+  const supabase = getSupabaseAdmin();
+  if (supabase) {
+    try {
+      const { data: updated, error } = await supabase
+        .from("resources")
+        .update({
+          ...data,
+          tags: Array.isArray(merged.tags) ? merged.tags : [],
+          updated_at: now,
+        })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (!error && updated) {
+        try {
+          const db = getDb();
+          db.prepare(`
+            UPDATE resources SET
+              title = ?, description = ?, drive_url = ?, category = ?, resource_type = ?,
+              cover_image_url = ?, tags = ?, related_event = ?, event_date = ?, status = ?,
+              display_order = ?, featured = ?, updated_at = ?
+            WHERE id = ?
+          `).run(
+            updated.title,
+            updated.description,
+            updated.drive_url,
+            updated.category,
+            updated.resource_type,
+            updated.cover_image_url,
+            JSON.stringify(updated.tags || []),
+            updated.related_event,
+            updated.event_date,
+            updated.status,
+            updated.display_order,
+            updated.featured ? 1 : 0,
+            now,
+            id
+          );
+        } catch {}
+
+        return {
+          ...updated,
+          featured: Boolean(updated.featured),
+          tags: Array.isArray(updated.tags) ? updated.tags : [],
+        };
+      }
+    } catch {}
+  }
+
+  const db = getDb();
+  db.prepare(`
+    UPDATE resources SET
+      title = ?, description = ?, drive_url = ?, category = ?, resource_type = ?,
+      cover_image_url = ?, tags = ?, related_event = ?, event_date = ?, status = ?,
+      display_order = ?, featured = ?, updated_at = ?
+    WHERE id = ?
+  `).run(
+    merged.title,
+    merged.description || null,
+    merged.drive_url,
+    merged.category,
+    merged.resource_type,
+    merged.cover_image_url || null,
+    JSON.stringify(merged.tags || []),
+    merged.related_event || null,
+    merged.event_date || null,
+    merged.status,
+    merged.display_order,
+    merged.featured ? 1 : 0,
+    now,
+    id
+  );
+
+  return merged;
+}
+
+export async function deleteResource(id: string): Promise<boolean> {
+  const existing = await getResourceById(id);
+  if (!existing) return false;
+
+  const supabase = getSupabaseAdmin();
+  if (supabase) {
+    try {
+      await supabase.from("resources").delete().eq("id", id);
+    } catch {}
+  }
+
+  // Delete cover image if it was stored in local uploads (Note: never touches drive_url!)
+  if (existing.cover_image_url && existing.cover_image_url.startsWith("/uploads/")) {
+    const localPath = path.join(process.cwd(), "public", existing.cover_image_url);
+    if (fs.existsSync(localPath)) {
+      try {
+        fs.unlinkSync(localPath);
+      } catch {}
+    }
+  }
+
+  const db = getDb();
+  const res = db.prepare("DELETE FROM resources WHERE id = ?").run(id);
+  return res.changes > 0;
+}
+
+// ==============================================================================
 // 5. COMMUNITY PROFILES REPOSITORY
 // ==============================================================================
 
@@ -2142,6 +2635,17 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
       supabase.from("join_requests").select("*", { count: "exact", head: true }).eq("status", "new"),
     ]);
 
+    let totalResources = 0;
+    let publishedResources = 0;
+    try {
+      const [{ count: totRes }, { count: pubRes }] = await Promise.all([
+        supabase.from("resources").select("*", { count: "exact", head: true }),
+        supabase.from("resources").select("*", { count: "exact", head: true }).eq("status", "published"),
+      ]);
+      totalResources = totRes || 0;
+      publishedResources = pubRes || 0;
+    } catch {}
+
     return {
       totalEvents: totalEvents || 0,
       publishedEvents: publishedEvents || 0,
@@ -2151,6 +2655,8 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
       activeAnnouncements: activeAnnouncements || 0,
       unreadMessages: unreadMessages || 0,
       pendingJoinRequests: pendingJoinRequests || 0,
+      totalResources,
+      publishedResources,
     };
   }
 
@@ -2163,6 +2669,12 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   const activeAnnouncements = (db.prepare("SELECT COUNT(*) as c FROM announcements WHERE status = 'published'").get() as any).c;
   const unreadMessages = (db.prepare("SELECT COUNT(*) as c FROM contact_messages WHERE status = 'new'").get() as any).c;
   const pendingJoinRequests = (db.prepare("SELECT COUNT(*) as c FROM join_requests WHERE status = 'new'").get() as any).c;
+  let totalResources = 0;
+  let publishedResources = 0;
+  try {
+    totalResources = (db.prepare("SELECT COUNT(*) as c FROM resources").get() as any).c;
+    publishedResources = (db.prepare("SELECT COUNT(*) as c FROM resources WHERE status = 'published'").get() as any).c;
+  } catch {}
 
   return {
     totalEvents,
@@ -2173,6 +2685,8 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     activeAnnouncements,
     unreadMessages,
     pendingJoinRequests,
+    totalResources,
+    publishedResources,
   };
 }
 

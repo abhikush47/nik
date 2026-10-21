@@ -11,6 +11,7 @@ import {
   ArrowRight,
   TrendingUp,
   ShieldAlert,
+  FolderOpen,
 } from "lucide-react";
 import { getCurrentAdmin } from "@/lib/auth";
 import { getDashboardMetrics, getAdminActivityLogs } from "@/lib/db";
@@ -114,6 +115,29 @@ export default async function AdminDashboardPage() {
             className="text-[11px] font-bold text-[#0B3D2E] hover:underline flex items-center gap-1 pt-1"
           >
             <span>Manage Photos</span>
+            <ArrowRight className="w-3 h-3" />
+          </Link>
+        </div>
+
+        {/* Resources Metric */}
+        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-3">
+          <div className="flex items-center justify-between text-gray-500">
+            <span className="text-xs font-bold uppercase tracking-wider">Resources</span>
+            <FolderOpen className="w-4 h-4 text-emerald-700" />
+          </div>
+          <div>
+            <p className="text-2xl sm:text-3xl font-black text-gray-900 font-display">
+              {metrics.totalResources ?? 0}
+            </p>
+            <p className="text-[11px] text-gray-500 mt-0.5">
+              {metrics.publishedResources ?? 0} Published
+            </p>
+          </div>
+          <Link
+            href="/admin/resources"
+            className="text-[11px] font-bold text-[#0B3D2E] hover:underline flex items-center gap-1 pt-1"
+          >
+            <span>Manage Resources</span>
             <ArrowRight className="w-3 h-3" />
           </Link>
         </div>

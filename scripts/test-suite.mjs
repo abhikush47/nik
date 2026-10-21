@@ -27,7 +27,7 @@ async function runTests() {
 
   // 1. PUBLIC PAGES AVAILABILITY
   console.log("--- Testing Public Page Availability ---");
-  const pages = ["/", "/about", "/community", "/events", "/gallery", "/announcements", "/join", "/contact", "/privacy"];
+  const pages = ["/", "/about", "/community", "/events", "/gallery", "/resources", "/announcements", "/join", "/contact", "/privacy"];
   for (const page of pages) {
     const res = await fetch(`${BASE_URL}${page}`);
     assert(res.status === 200, `Public route ${page} returns 200 OK`);
@@ -39,6 +39,7 @@ async function runTests() {
     "/api/admin/announcements",
     "/api/admin/events",
     "/api/admin/gallery",
+    "/api/admin/resources",
     "/api/admin/messages",
     "/api/admin/community",
     "/api/admin/pages",
@@ -243,6 +244,60 @@ async function runTests() {
     headers: { Cookie: adminCookie },
   });
   assert(galDelRes.status === 200, "Admin deletes gallery photo");
+
+  // 7.5. RESOURCE HUB LIFECYCLE (VALIDATE -> ADD -> EDIT -> DELETE)
+  console.log("\n--- Testing Resource Hub Lifecycle ---");
+  let createdResourceId = "";
+
+  // Test invalid Google Drive URL rejection (400)
+  const resInvalidRes = await fetch(`${BASE_URL}/api/admin/resources`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: adminCookie },
+    body: JSON.stringify({
+      title: "Malicious Resource",
+      drive_url: "https://evil-phishing-site.com/malware.exe",
+      category: "Documents",
+    }),
+  });
+  assert(resInvalidRes.status === 400, "Admin endpoint blocks unapproved non-Google Drive URLs with 400");
+
+  // Create valid resource
+  const resCreateRes = await fetch(`${BASE_URL}/api/admin/resources`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: adminCookie },
+    body: JSON.stringify({
+      title: "Test Community Document Hub",
+      description: "Official test documents and guides for NIK students",
+      drive_url: "https://drive.google.com/drive/folders/1aBcDeFgHiJkLmNoPqRsTuVwXyZ",
+      category: "Documents",
+      resource_type: "Google Drive Folder",
+      tags: ["orientation", "guidelines"],
+      status: "published",
+      display_order: 1,
+    }),
+  });
+  const resCreateData = await resCreateRes.json();
+  assert(resCreateRes.status === 200 && resCreateData.success, "Admin creates valid Google Drive resource");
+  createdResourceId = resCreateData.item.id;
+
+  // Edit / toggle resource
+  const resEditRes = await fetch(`${BASE_URL}/api/admin/resources/${createdResourceId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: adminCookie },
+    body: JSON.stringify({
+      title: "Updated Community Document Hub",
+      status: "draft",
+    }),
+  });
+  const resEditData = await resEditRes.json();
+  assert(resEditRes.status === 200 && resEditData.item.status === "draft", "Admin edits resource and toggles status to draft");
+
+  // Delete resource
+  const resDelRes = await fetch(`${BASE_URL}/api/admin/resources/${createdResourceId}`, {
+    method: "DELETE",
+    headers: { Cookie: adminCookie },
+  });
+  assert(resDelRes.status === 200, "Admin deletes resource record");
 
   // 8. MESSAGES & JOIN REQUESTS MANAGEMENT
   console.log("\n--- Testing Messages & Join Requests Inbox Management ---");
