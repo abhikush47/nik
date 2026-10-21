@@ -13,6 +13,8 @@ import {
   Star,
   Camera,
   Tag,
+  Layers,
+  CheckCircle2,
 } from "lucide-react";
 import { GalleryImage, GalleryCategory } from "@/lib/types";
 
@@ -27,6 +29,16 @@ export default function AdminGalleryPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [deleteConfirmItem, setDeleteConfirmItem] = useState<{ id: string; title: string } | null>(null);
+
+  // Batch Upload States
+  const [batchModalOpen, setBatchModalOpen] = useState(false);
+  const [batchFiles, setBatchFiles] = useState<File[]>([]);
+  const [batchCategory, setBatchCategory] = useState("dashain");
+  const [batchCredit, setBatchCredit] = useState("NIK Media Team");
+  const [batchTitlePrefix, setBatchTitlePrefix] = useState("");
+  const [batchStatus, setBatchStatus] = useState<"published" | "draft">("published");
+  const [batchUploading, setBatchUploading] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -192,6 +204,55 @@ export default function AdminGalleryPage() {
     }
   };
 
+  const handleBatchFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const selected = Array.from(e.target.files);
+      setBatchFiles((prev) => [...prev, ...selected]);
+    }
+  };
+
+  const removeBatchFile = (index: number) => {
+    setBatchFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleBatchSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (batchFiles.length === 0) {
+      setError("Please select at least one photo to upload.");
+      return;
+    }
+
+    setBatchUploading(true);
+    setBatchProgress(`Uploading ${batchFiles.length} photos...`);
+    setError(null);
+
+    try {
+      const form = new FormData();
+      batchFiles.forEach((file) => form.append("files", file));
+      form.append("category_slug", batchCategory);
+      form.append("photographer_credit", batchCredit);
+      form.append("title_prefix", batchTitlePrefix);
+      form.append("status", batchStatus);
+
+      const res = await fetch("/api/admin/gallery/batch", {
+        method: "POST",
+        body: form,
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Batch upload failed");
+
+      setSuccess(`Successfully uploaded ${data.count} photos to "${batchCategory}"!`);
+      setBatchFiles([]);
+      setBatchModalOpen(false);
+      await fetchData();
+    } catch (err: any) {
+      setError(err.message || "Failed to batch upload photos");
+    } finally {
+      setBatchUploading(false);
+      setBatchProgress(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -206,13 +267,28 @@ export default function AdminGalleryPage() {
           </p>
         </div>
 
-        <button
-          onClick={openCreateModal}
-          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#0B3D2E] text-white text-xs font-bold hover:bg-[#07261D] transition-colors shadow-xs"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Upload Photograph</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setBatchFiles([]);
+              setBatchCategory(categories[0]?.slug || "dashain");
+              setBatchTitlePrefix("Dashain Celebration");
+              setBatchModalOpen(true);
+            }}
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border-2 border-[#0B3D2E] text-[#0B3D2E] bg-emerald-50/50 hover:bg-[#0B3D2E] hover:text-white text-xs font-bold transition-all shadow-xs"
+          >
+            <Layers className="w-4 h-4" />
+            <span>Batch Upload Photos</span>
+          </button>
+
+          <button
+            onClick={openCreateModal}
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#0B3D2E] text-white text-xs font-bold hover:bg-[#07261D] transition-colors shadow-xs"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Upload Single</span>
+          </button>
+        </div>
       </div>
 
       {success && (
@@ -473,7 +549,7 @@ export default function AdminGalleryPage() {
             </div>
             <p className="text-xs text-gray-600 mb-6 leading-relaxed">
               Are you sure you want to permanently delete{" "}
-              <strong className="text-gray-900 font-semibold">"{deleteConfirmItem.title}"</strong>?
+              <strong className="text-gray-900 font-semibold">&ldquo;{deleteConfirmItem.title}&rdquo;</strong>?
               The photograph record and its cloud storage file will be removed.
             </p>
             <div className="flex items-center justify-end gap-2.5">
@@ -495,6 +571,196 @@ export default function AdminGalleryPage() {
                 <span>Delete Photograph</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Batch Upload Modal */}
+      {batchModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 my-8">
+            <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-[#0B3D2E]">
+                  <Layers className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-gray-900">Batch Upload Photographs</h2>
+                  <p className="text-[11px] text-gray-500">Upload multiple photos all at once into the gallery</p>
+                </div>
+              </div>
+              <button
+                onClick={() => !batchUploading && setBatchModalOpen(false)}
+                disabled={batchUploading}
+                className="text-gray-400 hover:text-gray-600 disabled:opacity-40"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleBatchSubmit} className="space-y-4 pt-4 text-xs">
+              {/* Drop / Multi-file Picker */}
+              <div className="border-2 border-dashed border-gray-300 rounded-xl p-5 text-center bg-gray-50/50 hover:bg-gray-50 hover:border-[#0B3D2E] transition-colors">
+                <input
+                  type="file"
+                  id="batch_file_input"
+                  multiple
+                  accept="image/*"
+                  onChange={handleBatchFileSelect}
+                  className="hidden"
+                />
+                <label htmlFor="batch_file_input" className="cursor-pointer block space-y-2">
+                  <div className="w-10 h-10 rounded-full bg-emerald-50 text-[#0B3D2E] flex items-center justify-center mx-auto border border-emerald-200">
+                    <Upload className="w-5 h-5" />
+                  </div>
+                  <div className="font-bold text-gray-900 text-xs">
+                    Click to select multiple photos, or drag &amp; drop
+                  </div>
+                  <p className="text-[11px] text-gray-500">
+                    JPG, PNG, WebP, AVIF up to 15MB each
+                  </p>
+                </label>
+              </div>
+
+              {/* Selected Files Badge & List */}
+              {batchFiles.length > 0 && (
+                <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-bold text-emerald-900 text-xs flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      {batchFiles.length} photo{batchFiles.length > 1 ? "s" : ""} selected for upload
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setBatchFiles([])}
+                      className="text-[11px] text-red-600 hover:underline font-semibold"
+                    >
+                      Clear all
+                    </button>
+                  </div>
+                  <div className="max-h-32 overflow-y-auto space-y-1 pr-1">
+                    {batchFiles.map((f, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between text-[11px] bg-white px-2.5 py-1 rounded border border-emerald-100 text-gray-700"
+                      >
+                        <span className="truncate max-w-[280px]" title={f.name}>
+                          {idx + 1}. {f.name}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-gray-400">
+                            {(f.size / (1024 * 1024)).toFixed(1)} MB
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeBatchFile(idx)}
+                            className="text-gray-400 hover:text-red-500"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Category */}
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">
+                  Target Gallery Category <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={batchCategory}
+                  onChange={(e) => setBatchCategory(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-xs bg-white font-medium text-gray-900"
+                >
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.slug}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Choose &ldquo;Dashain Celebrations&rdquo; so they display under that tab.
+                </p>
+              </div>
+
+              {/* Title Prefix */}
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">
+                  Photo Title Prefix <span className="text-gray-400 font-normal">(Optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={batchTitlePrefix}
+                  onChange={(e) => setBatchTitlePrefix(e.target.value)}
+                  placeholder="e.g. Dashain Celebration 2026 (leave empty to use original file names)"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-xs"
+                />
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  If set, images will be named &ldquo;{batchTitlePrefix || "Prefix"} #1&rdquo;, &ldquo;{batchTitlePrefix || "Prefix"} #2&rdquo;, etc.
+                </p>
+              </div>
+
+              {/* Credit & Status */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">Photographer Credit</label>
+                  <input
+                    type="text"
+                    value={batchCredit}
+                    onChange={(e) => setBatchCredit(e.target.value)}
+                    placeholder="e.g. NIK Media Team"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">Status</label>
+                  <select
+                    value={batchStatus}
+                    onChange={(e) => setBatchStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-xs bg-white"
+                  >
+                    <option value="published">Published (Visible immediately)</option>
+                    <option value="draft">Draft (Hidden)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Upload Progress Message */}
+              {batchUploading && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 text-xs flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-600 shrink-0" />
+                  <span>{batchProgress || "Uploading photos to cloud storage..."}</span>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={batchUploading}
+                  onClick={() => setBatchModalOpen(false)}
+                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-semibold disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={batchUploading || batchFiles.length === 0}
+                  className="px-5 py-2 rounded-lg bg-[#0B3D2E] text-white font-bold disabled:opacity-50 flex items-center gap-1.5 shadow-sm hover:bg-[#07261D]"
+                >
+                  {batchUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Layers className="w-3.5 h-3.5" />}
+                  <span>
+                    {batchUploading
+                      ? "Uploading..."
+                      : `Upload All ${batchFiles.length > 0 ? `(${batchFiles.length})` : ""} Photos`}
+                  </span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
