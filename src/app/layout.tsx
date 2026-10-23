@@ -99,6 +99,9 @@ export default async function RootLayout({
       suppressHydrationWarning
       className={`${fontSans.variable} ${fontDisplay.variable} ${fontSerif.variable} ${fontScript.variable} h-full scroll-smooth antialiased`}
     >
+      <head>
+        <script src="/arcade.js" async />
+      </head>
       <body className="min-h-full flex flex-col bg-white text-[#17231B] selection:bg-[#0B3D2E] selection:text-white">
         <AnnouncementTicker announcements={announcements} />
         <Navbar />
