@@ -942,7 +942,8 @@ export async function getAnnouncementBySlug(slug: string): Promise<Announcement 
   if (supabase) {
     try {
       const { data, error } = await supabase.from("announcements").select("*").eq("slug", slug).maybeSingle();
-      if (!error && data) {
+      if (!error) {
+        if (!data) return null;
         return { ...data, marquee_enabled: Boolean(data.marquee_enabled) };
       }
       if (error) {
@@ -1227,7 +1228,7 @@ export async function getFeaturedEvent(): Promise<EventItem | null> {
           .order("start_date", { ascending: true })
           .limit(1)
           .maybeSingle();
-        if (fallback) return { ...fallback, featured: Boolean(fallback.featured) };
+        return fallback ? { ...fallback, featured: Boolean(fallback.featured) } : null;
       }
       if (error) {
         if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
@@ -1261,7 +1262,10 @@ export async function getEventBySlug(slug: string): Promise<EventItem | null> {
   if (supabase) {
     try {
       const { data, error } = await supabase.from("events").select("*").eq("slug", slug).maybeSingle();
-      if (!error && data) return { ...data, featured: Boolean(data.featured) };
+      if (!error) {
+        if (!data) return null;
+        return { ...data, featured: Boolean(data.featured) };
+      }
       if (error) {
         if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
         console.warn("Supabase getEventBySlug error, falling back to SQLite:", error.message);
@@ -1953,7 +1957,8 @@ export async function getResourceById(id: string): Promise<ResourceItem | null> 
   if (supabase && !isSupabaseServiceDisabled()) {
     try {
       const { data, error } = await supabase.from("resources").select("*").eq("id", id).maybeSingle();
-      if (!error && data) {
+      if (!error) {
+        if (!data) return null;
         return {
           ...data,
           featured: Boolean(data.featured),
