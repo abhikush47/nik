@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { getResourceById, updateResource, deleteResource, logAdminActivity } from "@/lib/db";
 import { isValidGoogleDriveUrl, detectGoogleDriveType } from "@/lib/validation";
+import { revalidateWebsite } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -137,6 +138,7 @@ export async function PUT(
       `Updated resource "${updated.title}" (status: ${updated.status})`
     );
 
+    revalidateWebsite();
     return NextResponse.json({ success: true, item: updated });
   } catch (err: any) {
     if (err.message === "UNAUTHORIZED") {
@@ -172,6 +174,7 @@ export async function DELETE(
       );
     }
 
+    revalidateWebsite();
     return NextResponse.json({ success: true, deleted });
   } catch (err: any) {
     if (err.message === "UNAUTHORIZED") {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { getSiteSettings, updateSiteSettings, logAdminActivity } from "@/lib/db";
+import { revalidateWebsite } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,7 @@ export async function PUT(req: NextRequest) {
       `Updated site configuration (${updated.community_name})`
     );
 
+    revalidateWebsite();
     return NextResponse.json({ success: true, settings: updated });
   } catch (err: any) {
     if (err.message === "UNAUTHORIZED") {

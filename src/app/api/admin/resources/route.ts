@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { getResources, getResourceCategories, createResource, logAdminActivity } from "@/lib/db";
 import { isValidGoogleDriveUrl, detectGoogleDriveType } from "@/lib/validation";
+import { revalidateWebsite } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +102,7 @@ export async function POST(req: NextRequest) {
       `Created resource: "${created.title}" (${created.category})`
     );
 
+    revalidateWebsite();
     return NextResponse.json({ success: true, item: created });
   } catch (err: any) {
     if (err.message === "UNAUTHORIZED") {

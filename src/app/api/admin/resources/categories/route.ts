@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { getResourceCategories, createResourceCategory, logAdminActivity } from "@/lib/db";
+import { revalidateWebsite } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,7 @@ export async function POST(req: NextRequest) {
       `Created resource category "${created.name}"`
     );
 
+    revalidateWebsite();
     return NextResponse.json({ success: true, category: created });
   } catch (err: any) {
     if (err.message === "UNAUTHORIZED") {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { getEvents, createEvent, logAdminActivity } from "@/lib/db";
+import { revalidateWebsite } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +84,7 @@ export async function POST(req: NextRequest) {
       `Created event: "${created.title}"`
     );
 
+    revalidateWebsite();
     return NextResponse.json({ success: true, item: created });
   } catch (err: any) {
     if (err.message === "UNAUTHORIZED") {

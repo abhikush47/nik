@@ -27,6 +27,7 @@ import {
 import HimalayanHeroCanvas from "@/components/HimalayanHeroCanvas";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function HomePage() {
   const [settings, upcomingEvents, resources, categories, announcements] = await Promise.all([

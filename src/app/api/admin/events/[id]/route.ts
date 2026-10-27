@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { updateEvent, deleteEvent, logAdminActivity } from "@/lib/db";
+import { revalidateWebsite } from "@/lib/revalidate";
+
+export const dynamic = "force-dynamic";
 
 export async function PUT(
   req: NextRequest,
@@ -21,6 +24,7 @@ export async function PUT(
       `Updated event: "${updated.title}" (Status: ${updated.status}, Featured: ${updated.featured})`
     );
 
+    revalidateWebsite();
     return NextResponse.json({ success: true, item: updated });
   } catch (err: any) {
     if (err.message === "UNAUTHORIZED") {
@@ -46,6 +50,7 @@ export async function DELETE(
 
     await logAdminActivity(admin.email, "DELETE", "EVENT", id, `Deleted event ID: ${id}`);
 
+    revalidateWebsite();
     return NextResponse.json({ success: true });
   } catch (err: any) {
     if (err.message === "UNAUTHORIZED") {

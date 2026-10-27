@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { updateCommunityProfile, deleteCommunityProfile, logAdminActivity } from "@/lib/db";
+import { revalidateWebsite } from "@/lib/revalidate";
+
+export const dynamic = "force-dynamic";
 
 export async function PUT(
   req: NextRequest,
@@ -21,6 +24,7 @@ export async function PUT(
       `Updated profile: ${updated.name}`
     );
 
+    revalidateWebsite();
     return NextResponse.json({ success: true, item: updated });
   } catch (err: any) {
     if (err.message === "UNAUTHORIZED") {
@@ -45,6 +49,7 @@ export async function DELETE(
 
     await logAdminActivity(admin.email, "DELETE", "COMMUNITY_PROFILE", id, `Deleted profile ID: ${id}`);
 
+    revalidateWebsite();
     return NextResponse.json({ success: true });
   } catch (err: any) {
     if (err.message === "UNAUTHORIZED") {

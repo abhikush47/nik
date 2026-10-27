@@ -9,6 +9,7 @@ export const metadata = {
 };
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function AboutPage() {
   const [storyContent, valuesContent, profiles] = await Promise.all([
@@ -53,15 +54,25 @@ export default async function AboutPage() {
               {storyContent?.title || "Why NEPALI IN KIIT Exists"}
             </h2>
             <div className="prose prose-gray max-w-none text-gray-700 leading-relaxed space-y-4 text-base">
-              <p>
-                KIIT Deemed to be University attracts hundreds of talented Nepali students every year to its engineering, medical, computer science, law, and biotechnology schools. Leaving home, family, and familiar mountains to study in Odisha is an exciting leap—yet adjusting to a new city, language, and campus environment brings real challenges.
-              </p>
-              <p>
-                NEPALI IN KIIT (NIK) was formed organically as an open student space where seniors welcome incoming freshers, help them settle into hostels, explain academic pathways, celebrate traditional festivals, and cultivate mutual support.
-              </p>
-              <p className="font-semibold text-gray-900 bg-[#FFF8ED] p-4 sm:p-5 rounded-2xl border-l-4 border-[#0B3D2E] shadow-2xs leading-relaxed text-sm">
-                NIK belongs equally to every Nepali student at KIIT. It is not an exclusive club or the private domain of any single individual; it is the collective pride of our student body.
-              </p>
+              {storyContent?.content ? (
+                <div className="space-y-4">
+                  {storyContent.content.split("\n\n").map((para, i) => (
+                    <p key={i}>{para}</p>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <p>
+                    KIIT Deemed to be University attracts hundreds of talented Nepali students every year to its engineering, medical, computer science, law, and biotechnology schools. Leaving home, family, and familiar mountains to study in Odisha is an exciting leap—yet adjusting to a new city, language, and campus environment brings real challenges.
+                  </p>
+                  <p>
+                    NEPALI IN KIIT (NIK) was formed organically as an open student space where seniors welcome incoming freshers, help them settle into hostels, explain academic pathways, celebrate traditional festivals, and cultivate mutual support.
+                  </p>
+                  <p className="font-semibold text-gray-900 bg-[#FFF8ED] p-4 sm:p-5 rounded-2xl border-l-4 border-[#0B3D2E] shadow-2xs leading-relaxed text-sm">
+                    NIK belongs equally to every Nepali student at KIIT. It is not an exclusive club or the private domain of any single individual; it is the collective pride of our student body.
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>
