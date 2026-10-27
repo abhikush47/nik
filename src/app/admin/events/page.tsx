@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   Calendar,
@@ -15,8 +16,10 @@ import {
   MapPin,
 } from "lucide-react";
 import { EventItem } from "@/lib/types";
+import { notifyWebsiteUpdate } from "@/lib/broadcast";
 
 export default function AdminEventsPage() {
+  const router = useRouter();
   const [items, setItems] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -179,6 +182,8 @@ export default function AdminEventsPage() {
         setSuccess("Event created successfully!");
       }
       setModalOpen(false);
+      notifyWebsiteUpdate();
+      router.refresh();
       await fetchItems();
     } catch (err: any) {
       setError(err.message || "An error occurred");
@@ -196,6 +201,8 @@ export default function AdminEventsPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to delete event");
       setSuccess("Event deleted.");
+      notifyWebsiteUpdate();
+      router.refresh();
       await fetchItems();
     } catch (err: any) {
       setError(err.message || "Failed to delete event");
@@ -214,6 +221,8 @@ export default function AdminEventsPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to update featured status");
+      notifyWebsiteUpdate();
+      router.refresh();
       fetchItems();
     } catch (err: any) {
       setError(err.message || "Failed to update featured status");

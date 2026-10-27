@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Megaphone,
   Plus,
@@ -14,8 +15,10 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { Announcement } from "@/lib/types";
+import { notifyWebsiteUpdate } from "@/lib/broadcast";
 
 export default function AdminAnnouncementsPage() {
+  const router = useRouter();
   const [items, setItems] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -39,7 +42,7 @@ export default function AdminAnnouncementsPage() {
 
   const fetchItems = async () => {
     try {
-      const res = await fetch("/api/admin/announcements");
+      const res = await fetch(`/api/admin/announcements?_t=${Date.now()}`, { cache: "no-store" });
       const data = await res.json();
       if (res.ok && data.items) {
         setItems(data.items);
@@ -115,6 +118,8 @@ export default function AdminAnnouncementsPage() {
         setSuccess("Announcement created successfully!");
       }
       setModalOpen(false);
+      notifyWebsiteUpdate();
+      router.refresh();
       await fetchItems();
     } catch (err: any) {
       setError(err.message || "An error occurred");
@@ -132,6 +137,8 @@ export default function AdminAnnouncementsPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to delete announcement");
       setSuccess("Announcement deleted.");
+      notifyWebsiteUpdate();
+      router.refresh();
       await fetchItems();
     } catch (err: any) {
       setError(err.message || "Failed to delete announcement");
@@ -150,6 +157,8 @@ export default function AdminAnnouncementsPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to update marquee status");
+      notifyWebsiteUpdate();
+      router.refresh();
       fetchItems();
     } catch (err: any) {
       setError(err.message || "Failed to update marquee status");

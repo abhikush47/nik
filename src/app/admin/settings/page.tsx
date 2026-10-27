@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Settings, Save, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { SiteSettings } from "@/lib/types";
+import { notifyWebsiteUpdate } from "@/lib/broadcast";
 
 export default function AdminSettingsPage() {
+  const router = useRouter();
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -13,7 +16,7 @@ export default function AdminSettingsPage() {
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch("/api/admin/settings");
+      const res = await fetch(`/api/admin/settings?_t=${Date.now()}`, { cache: "no-store" });
       const data = await res.json();
       if (res.ok && data.settings) {
         setSettings(data.settings);
@@ -47,6 +50,8 @@ export default function AdminSettingsPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to save site settings");
       setSuccess("Site configuration updated successfully!");
+      notifyWebsiteUpdate();
+      router.refresh();
     } catch (err: any) {
       setError(err.message || "Failed to save site settings");
     } finally {

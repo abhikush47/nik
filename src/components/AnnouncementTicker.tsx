@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Megaphone, X, ExternalLink, ChevronRight } from "lucide-react";
 import { Announcement } from "@/lib/types";
@@ -9,16 +10,53 @@ interface AnnouncementTickerProps {
   announcements: Announcement[];
 }
 
-export default function AnnouncementTicker({ announcements }: AnnouncementTickerProps) {
+export default function AnnouncementTicker({ announcements: initialAnnouncements }: AnnouncementTickerProps) {
+  const router = useRouter();
+  const [items, setItems] = useState<Announcement[]>(initialAnnouncements || []);
   const [dismissed, setDismissed] = useState(false);
 
-  if (dismissed || !announcements || announcements.length === 0) {
+  useEffect(() => {
+    setItems(initialAnnouncements || []);
+  }, [initialAnnouncements]);
+
+  useEffect(() => {
+    const fetchLatest = async () => {
+      try {
+        const res = await fetch(`/api/announcements?marquee=1&_t=${Date.now()}`, { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.announcements)) setItems(data.announcements);
+        }
+      } catch {}
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "nik_data_updated") {
+        fetchLatest();
+        router.refresh();
+      }
+    };
+
+    const handleFocus = () => {
+      fetchLatest();
+      router.refresh();
+    };
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [router]);
+
+  if (dismissed || !items || items.length === 0) {
     return null;
   }
 
   // Filter only published announcements with marquee_enabled
-  const activeItems = announcements.filter((a) => a.marquee_enabled);
-  const itemsToDisplay = activeItems.length > 0 ? activeItems : announcements;
+  const activeItems = items.filter((a) => a.marquee_enabled);
+  const itemsToDisplay = activeItems.length > 0 ? activeItems : items;
 
   // Duplicate items for continuous seamless marquee loop
   const displayItems =

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   Search,
@@ -63,11 +64,64 @@ function getResourceTypeBadgeClass(type: ResourceType) {
 }
 
 export default function ResourcesHub({ initialResources, categories }: ResourcesHubProps) {
+  const router = useRouter();
+  const [resources, setResources] = useState<ResourceItem[]>(initialResources);
+  const [categoryList, setCategoryList] = useState<ResourceCategory[]>(categories);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Sync state if server props update
+  useEffect(() => {
+    setResources(initialResources);
+  }, [initialResources]);
+
+  useEffect(() => {
+    setCategoryList(categories);
+  }, [categories]);
+
+  // Real-time zero-delay revalidation across tabs and window focus
+  useEffect(() => {
+    const fetchLatest = async () => {
+      try {
+        const res = await fetch(`/api/resources?_t=${Date.now()}`, { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.resources)) setResources(data.resources);
+          if (Array.isArray(data.categories)) setCategoryList(data.categories);
+        }
+      } catch {}
+    };
+
+    const handleUpdate = () => {
+      fetchLatest();
+      router.refresh();
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "nik_data_updated") {
+        handleUpdate();
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        handleUpdate();
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("focus", handleUpdate);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("focus", handleUpdate);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [router]);
+
   const filteredResources = useMemo(() => {
-    return initialResources.filter((res) => {
+    return resources.filter((res) => {
       const matchesCategory =
         selectedCategory === "all" ||
         res.category.toLowerCase() === selectedCategory.toLowerCase();
@@ -83,12 +137,12 @@ export default function ResourcesHub({ initialResources, categories }: Resources
 
       return matchesCategory && matchesSearch;
     });
-  }, [initialResources, selectedCategory, searchQuery]);
+  }, [resources, selectedCategory, searchQuery]);
 
   const activeCategoryName =
     selectedCategory === "all"
       ? "All Resources"
-      : categories.find((c) => c.slug === selectedCategory || c.name.toLowerCase() === selectedCategory.toLowerCase())?.name || selectedCategory;
+      : categoryList.find((c) => c.slug === selectedCategory || c.name.toLowerCase() === selectedCategory.toLowerCase())?.name || selectedCategory;
 
   return (
     <div className="space-y-8">

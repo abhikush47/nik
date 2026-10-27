@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   FolderOpen,
@@ -27,9 +28,16 @@ import {
   Tag as TagIcon,
   Globe,
   Lock,
+  Database,
+  RefreshCw,
+  AlertTriangle,
+  Copy,
+  Check,
+  CheckCircle,
 } from "lucide-react";
 import { ResourceItem, ResourceCategory, ResourceType } from "@/lib/types";
 import { isValidGoogleDriveUrl, detectGoogleDriveType } from "@/lib/validation";
+import { notifyWebsiteUpdate } from "@/lib/broadcast";
 
 function getResourceTypeIcon(type: ResourceType) {
   switch (type) {
@@ -91,13 +99,54 @@ export default function AdminResourcesPage() {
     featured: false,
   });
 
+  const router = useRouter();
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
+  const [supabaseHealth, setSupabaseHealth] = useState<any>(null);
+  const [checkingSupabase, setCheckingSupabase] = useState(false);
+  const [syncingSupabase, setSyncingSupabase] = useState(false);
+  const [showSqlModal, setShowSqlModal] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
 
-  // Fetch resources & categories
+  // Check Supabase connection health
+  const checkSupabaseStatus = async () => {
+    setCheckingSupabase(true);
+    try {
+      const res = await fetch(`/api/admin/supabase-status?_t=${Date.now()}`, { cache: "no-store" });
+      const data = await res.json();
+      if (res.ok) {
+        setSupabaseHealth(data.health);
+      }
+    } catch (err) {
+      console.error("Supabase status check failed:", err);
+    } finally {
+      setCheckingSupabase(false);
+    }
+  };
+
+  // Sync all local SQLite data up to Supabase
+  const handleSyncToSupabase = async () => {
+    setSyncingSupabase(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/supabase-status", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to sync to Supabase");
+      }
+      setSuccess(`Synced ${data.syncResult?.syncedCategories || 0} categories & ${data.syncResult?.syncedResources || 0} resources to Supabase!`);
+      setSupabaseHealth(data.health);
+    } catch (err: any) {
+      setError(err.message || "Failed to sync to Supabase");
+    } finally {
+      setSyncingSupabase(false);
+    }
+  };
+
+  // Fetch resources & categories (with cache-busting)
   const fetchData = async () => {
     try {
-      const res = await fetch("/api/admin/resources");
+      const res = await fetch(`/api/admin/resources?_t=${Date.now()}`, { cache: "no-store" });
       const data = await res.json();
       if (res.ok) {
         setResources(data.resources || []);
@@ -112,6 +161,7 @@ export default function AdminResourcesPage() {
 
   useEffect(() => {
     fetchData();
+    checkSupabaseStatus();
   }, []);
 
   const openCreateModal = () => {
@@ -258,6 +308,8 @@ export default function AdminResourcesPage() {
       }
 
       setModalOpen(false);
+      notifyWebsiteUpdate();
+      router.refresh();
       await fetchData();
     } catch (err: any) {
       setError(err.message || "Failed to save resource");
@@ -278,6 +330,8 @@ export default function AdminResourcesPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to toggle status");
       setSuccess(`Resource "${item.title}" is now ${nextStatus}.`);
+      notifyWebsiteUpdate();
+      router.refresh();
       await fetchData();
     } catch (err: any) {
       setError(err.message || "Failed to update publication status");
@@ -298,6 +352,8 @@ export default function AdminResourcesPage() {
       if (!res.ok) throw new Error(data.error || "Failed to delete resource");
       setSuccess(`Resource record "${deleteConfirmItem.title}" was deleted.`);
       setDeleteConfirmItem(null);
+      notifyWebsiteUpdate();
+      router.refresh();
       await fetchData();
     } catch (err: any) {
       setError(err.message || "Failed to delete resource");
@@ -327,6 +383,8 @@ export default function AdminResourcesPage() {
       setNewCategoryName("");
       setNewCategoryDesc("");
       setCategoryModalOpen(false);
+      notifyWebsiteUpdate();
+      router.refresh();
       await fetchData();
     } catch (err: any) {
       setError(err.message || "Failed to add category");
@@ -425,6 +483,96 @@ export default function AdminResourcesPage() {
           </button>
         </div>
       )}
+
+      {/* Supabase Cloud Connection & Sync Status */}
+      <div className="bg-white rounded-2xl border border-gray-200/90 p-4 sm:p-5 shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+              supabaseHealth?.status === "connected"
+                ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                : supabaseHealth?.status === "restricted_quota"
+                ? "bg-amber-50 text-amber-700 border border-amber-200/60"
+                : "bg-blue-50 text-blue-700 border border-blue-200/60"
+            }`}>
+              <Database className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-gray-900">Supabase Cloud Database</span>
+                {checkingSupabase ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                    <Loader2 className="w-2.5 h-2.5 animate-spin" /> Checking...
+                  </span>
+                ) : supabaseHealth?.status === "connected" ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full border border-emerald-200">
+                    <CheckCircle className="w-2.5 h-2.5" /> Connected & Storing Resources
+                  </span>
+                ) : supabaseHealth?.status === "restricted_quota" ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-full border border-amber-200">
+                    <AlertTriangle className="w-2.5 h-2.5" /> Egress Quota Exceeded (SQLite Fallback Active)
+                  </span>
+                ) : supabaseHealth?.status === "missing_tables" ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-100/80 px-2 py-0.5 rounded-full border border-indigo-200">
+                    <AlertCircle className="w-2.5 h-2.5" /> Migration Needed
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
+                    Local SQLite Active
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-gray-500 mt-0.5">
+                {supabaseHealth?.message || "Local SQLite active and ready to mirror with Supabase."}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-center">
+            {supabaseHealth?.status === "missing_tables" && (
+              <button
+                onClick={() => setShowSqlModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 text-xs font-semibold transition-colors"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>View Migration SQL</span>
+              </button>
+            )}
+
+            <button
+              onClick={handleSyncToSupabase}
+              disabled={syncingSupabase || checkingSupabase}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-900 hover:bg-black text-white text-xs font-semibold transition-colors disabled:opacity-50"
+              title="Test connection and push all local resources to Supabase"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${syncingSupabase ? "animate-spin" : ""}`} />
+              <span>{syncingSupabase ? "Syncing..." : "Sync Local → Supabase"}</span>
+            </button>
+          </div>
+        </div>
+
+        {supabaseHealth?.status === "restricted_quota" && (
+          <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3 text-[11px] text-amber-900 space-y-1">
+            <p className="font-bold flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              How to restore Supabase Cloud:
+            </p>
+            <p className="text-amber-800 leading-relaxed">
+              Your free Supabase project <code className="bg-amber-100 px-1 rounded text-amber-900 font-mono">ursfdfolewopzrjdofiu</code> hit the free 5 GB bandwidth limit (HTTP 402). Don&apos;t worry: your website is running with zero downtime using local SQLite!
+              To restore Supabase, log in to{" "}
+              <a
+                href="https://supabase.com/dashboard/project/ursfdfolewopzrjdofiu/settings/billing/subscription"
+                target="_blank"
+                rel="noreferrer"
+                className="underline font-bold text-amber-950 inline-flex items-center gap-0.5 hover:text-black"
+              >
+                Supabase Billing Settings <ExternalLink className="w-2.5 h-2.5" />
+              </a>{" "}
+              and disable the Spend Cap, or add a fresh Supabase project in <code className="bg-amber-100 px-1 rounded text-amber-900 font-mono">.env.local</code>. Once done, click <strong>Sync Local → Supabase</strong> above!
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1164,6 +1312,136 @@ export default function AdminResourcesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* SQL Migration Modal */}
+      {showSqlModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-xl border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Database className="w-5 h-5 text-indigo-600" />
+                <h3 className="text-base font-bold text-gray-900">Supabase SQL Migration for Resources</h3>
+              </div>
+              <button
+                onClick={() => setShowSqlModal(false)}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-600 leading-relaxed">
+              Copy and paste this script into your{" "}
+              <a
+                href="https://supabase.com/dashboard/project/ursfdfolewopzrjdofiu/sql/new"
+                target="_blank"
+                rel="noreferrer"
+                className="underline font-bold text-indigo-600"
+              >
+                Supabase SQL Editor
+              </a>{" "}
+              and click <strong>Run</strong> to create the Resources Hub tables and Row Level Security policies:
+            </p>
+
+            <div className="relative">
+              <pre className="p-3 bg-gray-900 text-gray-100 rounded-xl text-[11px] font-mono overflow-x-auto max-h-60 leading-relaxed">
+{`CREATE TABLE IF NOT EXISTS resource_categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  slug TEXT UNIQUE NOT NULL,
+  description TEXT,
+  display_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS resources (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT,
+  drive_url TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'Other',
+  resource_type TEXT NOT NULL DEFAULT 'Google Drive Folder',
+  cover_image_url TEXT,
+  tags TEXT[] DEFAULT '{}',
+  related_event TEXT,
+  event_date DATE,
+  status TEXT NOT NULL DEFAULT 'published',
+  display_order INTEGER NOT NULL DEFAULT 0,
+  featured BOOLEAN NOT NULL DEFAULT false,
+  created_by TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE resource_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE resources ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public read resource categories" ON resource_categories FOR SELECT USING (true);
+CREATE POLICY "Public read published resources" ON resources FOR SELECT USING (status = 'published');
+CREATE POLICY "Admin write resource categories" ON resource_categories FOR ALL TO authenticated USING (true);
+CREATE POLICY "Admin write resources" ON resources FOR ALL TO authenticated USING (true);`}
+              </pre>
+
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(`CREATE TABLE IF NOT EXISTS resource_categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  slug TEXT UNIQUE NOT NULL,
+  description TEXT,
+  display_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS resources (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT,
+  drive_url TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'Other',
+  resource_type TEXT NOT NULL DEFAULT 'Google Drive Folder',
+  cover_image_url TEXT,
+  tags TEXT[] DEFAULT '{}',
+  related_event TEXT,
+  event_date DATE,
+  status TEXT NOT NULL DEFAULT 'published',
+  display_order INTEGER NOT NULL DEFAULT 0,
+  featured BOOLEAN NOT NULL DEFAULT false,
+  created_by TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE resource_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE resources ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public read resource categories" ON resource_categories FOR SELECT USING (true);
+CREATE POLICY "Public read published resources" ON resources FOR SELECT USING (status = 'published');
+CREATE POLICY "Admin write resource categories" ON resource_categories FOR ALL TO authenticated USING (true);
+CREATE POLICY "Admin write resources" ON resources FOR ALL TO authenticated USING (true);`);
+                  setCopiedSql(true);
+                  setTimeout(() => setCopiedSql(false), 2000);
+                }}
+                className="absolute top-2.5 right-2.5 inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white/20 hover:bg-white/30 text-white text-[11px] font-semibold backdrop-blur-xs transition-colors"
+              >
+                {copiedSql ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedSql ? "Copied!" : "Copy SQL"}</span>
+              </button>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowSqlModal(false)}
+                className="px-4 py-2 rounded-xl bg-gray-900 text-white text-xs font-bold hover:bg-black transition-colors"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

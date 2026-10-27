@@ -722,12 +722,14 @@ async function ensureSupabaseSeeded(supabase: NonNullable<ReturnType<typeof getS
         updated_at: now,
       }, { onConflict: "id" });
 
-      for (const c of SEED_CATEGORIES) {
-        await supabase.from("gallery_categories").upsert(c, { onConflict: "slug" });
-      }
-
-      for (const img of SEED_GALLERY_IMAGES) {
-        await supabase.from("gallery_images").upsert(img, { onConflict: "id" });
+      for (const c of SEED_RESOURCE_CATEGORIES) {
+        await supabase.from("resource_categories").upsert({
+          id: c.id,
+          name: c.name,
+          slug: c.slug,
+          description: c.description,
+          display_order: c.display_order,
+        }, { onConflict: "slug" });
       }
 
       for (const ev of SEED_EVENTS) {
@@ -1770,7 +1772,7 @@ export async function deleteGalleryImage(id: string): Promise<boolean> {
 
 export async function getResourceCategories(): Promise<ResourceCategory[]> {
   const supabase = getSupabaseAdmin();
-  if (supabase) {
+  if (supabase && !isSupabaseServiceDisabled()) {
     try {
       const { data, error } = await supabase
         .from("resource_categories")
@@ -1779,8 +1781,13 @@ export async function getResourceCategories(): Promise<ResourceCategory[]> {
       if (!error && data && data.length > 0) {
         return data;
       }
-    } catch {
-      // Fallback to SQLite
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getResourceCategories error:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getResourceCategories exception:", e?.message || e);
     }
   }
 
@@ -1810,7 +1817,7 @@ export async function createResourceCategory(name: string, slug?: string, descri
   const id = crypto.randomUUID();
 
   const supabase = getSupabaseAdmin();
-  if (supabase) {
+  if (supabase && !isSupabaseServiceDisabled()) {
     try {
       const { data: countData } = await supabase
         .from("resource_categories")
@@ -1821,6 +1828,7 @@ export async function createResourceCategory(name: string, slug?: string, descri
       const { data: created, error } = await supabase
         .from("resource_categories")
         .insert({
+          id,
           name: name.trim(),
           slug: finalSlug,
           description: description ? description.trim() : null,
@@ -1829,8 +1837,8 @@ export async function createResourceCategory(name: string, slug?: string, descri
         })
         .select()
         .single();
+
       if (!error && created) {
-        // Also sync SQLite
         try {
           const db = getDb();
           db.prepare(`
@@ -1840,8 +1848,12 @@ export async function createResourceCategory(name: string, slug?: string, descri
         } catch {}
         return created;
       }
-    } catch {
-      // Fallback
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase createResourceCategory error:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
     }
   }
 
@@ -1863,10 +1875,13 @@ export async function createResourceCategory(name: string, slug?: string, descri
 
 export async function deleteResourceCategory(id: string): Promise<boolean> {
   const supabase = getSupabaseAdmin();
-  if (supabase) {
+  if (supabase && !isSupabaseServiceDisabled()) {
     try {
-      await supabase.from("resource_categories").delete().eq("id", id);
-    } catch {}
+      const { error } = await supabase.from("resource_categories").delete().eq("id", id);
+      if (error && isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+    }
   }
   const db = getDb();
   const res = db.prepare("DELETE FROM resource_categories WHERE id = ?").run(id);
@@ -1879,7 +1894,7 @@ export async function getResources(options?: {
   search?: string;
 }): Promise<ResourceItem[]> {
   const supabase = getSupabaseAdmin();
-  if (supabase) {
+  if (supabase && !isSupabaseServiceDisabled()) {
     try {
       let query = supabase.from("resources").select("*");
       if (options?.onlyPublished) {
@@ -1916,8 +1931,13 @@ export async function getResources(options?: {
         }
         return results;
       }
-    } catch {
-      // Fallback
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getResources error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getResources exception, falling back to SQLite:", e?.message || e);
     }
   }
 
@@ -1963,7 +1983,7 @@ export async function getResources(options?: {
 
 export async function getResourceById(id: string): Promise<ResourceItem | null> {
   const supabase = getSupabaseAdmin();
-  if (supabase) {
+  if (supabase && !isSupabaseServiceDisabled()) {
     try {
       const { data, error } = await supabase.from("resources").select("*").eq("id", id).maybeSingle();
       if (!error && data) {
@@ -1977,7 +1997,12 @@ export async function getResourceById(id: string): Promise<ResourceItem | null> 
             : [],
         };
       }
-    } catch {}
+      if (error && isQuotaOrRestrictionError(error)) {
+        disableSupabaseService(error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+    }
   }
 
   const db = getDb();
@@ -1997,11 +2022,12 @@ export async function createResource(
   const id = crypto.randomUUID();
 
   const supabase = getSupabaseAdmin();
-  if (supabase) {
+  if (supabase && !isSupabaseServiceDisabled()) {
     try {
       const { data: created, error } = await supabase
         .from("resources")
         .insert({
+          id, // explicitly pass id so both Supabase and SQLite share the exact same UUID!
           ...data,
           tags: Array.isArray(data.tags) ? data.tags : [],
           created_at: now,
@@ -2046,8 +2072,13 @@ export async function createResource(
           tags: Array.isArray(created.tags) ? created.tags : [],
         };
       }
-    } catch {
-      // Fallback
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase createResource error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase createResource exception, falling back to SQLite:", e?.message || e);
     }
   }
 
@@ -2104,7 +2135,7 @@ export async function updateResource(
   };
 
   const supabase = getSupabaseAdmin();
-  if (supabase) {
+  if (supabase && !isSupabaseServiceDisabled()) {
     try {
       const { data: updated, error } = await supabase
         .from("resources")
@@ -2150,7 +2181,13 @@ export async function updateResource(
           tags: Array.isArray(updated.tags) ? updated.tags : [],
         };
       }
-    } catch {}
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase updateResource error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+    }
   }
 
   const db = getDb();
@@ -2185,10 +2222,13 @@ export async function deleteResource(id: string): Promise<boolean> {
   if (!existing) return false;
 
   const supabase = getSupabaseAdmin();
-  if (supabase) {
+  if (supabase && !isSupabaseServiceDisabled()) {
     try {
-      await supabase.from("resources").delete().eq("id", id);
-    } catch {}
+      const { error } = await supabase.from("resources").delete().eq("id", id);
+      if (error && isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+    }
   }
 
   // Delete cover image if it was stored in local uploads (Note: never touches drive_url!)
@@ -2204,6 +2244,79 @@ export async function deleteResource(id: string): Promise<boolean> {
   const db = getDb();
   const res = db.prepare("DELETE FROM resources WHERE id = ?").run(id);
   return res.changes > 0;
+}
+
+/**
+ * Synchronizes all local SQLite resources and categories up to Supabase.
+ * Call this whenever Supabase is unlocked or reconnected.
+ */
+export async function syncAllResourcesToSupabase(): Promise<{
+  success: boolean;
+  syncedCategories: number;
+  syncedResources: number;
+  error?: string;
+}> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    return { success: false, syncedCategories: 0, syncedResources: 0, error: "Supabase client not configured or disabled" };
+  }
+
+  try {
+    const db = getDb();
+    const categories = db.prepare("SELECT * FROM resource_categories ORDER BY display_order ASC").all() as ResourceCategory[];
+    const resources = db.prepare("SELECT * FROM resources ORDER BY display_order ASC, created_at DESC").all() as any[];
+
+    // 1. Sync Categories
+    let syncedCats = 0;
+    for (const cat of categories) {
+      const { error } = await supabase.from("resource_categories").upsert({
+        id: cat.id,
+        name: cat.name,
+        slug: cat.slug,
+        description: cat.description,
+        display_order: cat.display_order,
+      }, { onConflict: "slug" });
+      if (!error) syncedCats++;
+    }
+
+    // 2. Sync Resources
+    let syncedRes = 0;
+    for (const r of resources) {
+      const tags = typeof r.tags === "string" ? JSON.parse(r.tags || "[]") : Array.isArray(r.tags) ? r.tags : [];
+      const { error } = await supabase.from("resources").upsert({
+        id: r.id,
+        title: r.title,
+        description: r.description,
+        drive_url: r.drive_url,
+        category: r.category,
+        resource_type: r.resource_type,
+        cover_image_url: r.cover_image_url,
+        tags,
+        related_event: r.related_event,
+        event_date: r.event_date,
+        status: r.status,
+        display_order: r.display_order,
+        featured: Boolean(r.featured),
+        created_by: r.created_by,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+      }, { onConflict: "id" });
+      if (!error) syncedRes++;
+    }
+
+    return {
+      success: true,
+      syncedCategories: syncedCats,
+      syncedResources: syncedRes,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      syncedCategories: 0,
+      syncedResources: 0,
+      error: err?.message || String(err),
+    };
+  }
 }
 
 // ==============================================================================
