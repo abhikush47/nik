@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { FileText, Save, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { PageContent } from "@/lib/types";
+import { notifyWebsiteUpdate } from "@/lib/broadcast";
 
 export default function AdminPagesManager() {
+  const router = useRouter();
   const [pages, setPages] = useState<PageContent[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -13,7 +16,7 @@ export default function AdminPagesManager() {
 
   const fetchPages = async () => {
     try {
-      const res = await fetch("/api/admin/pages");
+      const res = await fetch(`/api/admin/pages?_t=${Date.now()}`, { cache: "no-store" });
       const data = await res.json();
       if (res.ok) setPages(data.items || []);
     } catch (e) {
@@ -53,6 +56,8 @@ export default function AdminPagesManager() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to save changes");
       setSuccess(`Saved changes for "${item.title}". Changes will appear on public site.`);
+      notifyWebsiteUpdate();
+      router.refresh();
     } catch (err: any) {
       setError(err.message || "Failed to save changes");
     } finally {

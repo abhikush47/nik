@@ -8,5 +8,13 @@ export function notifyWebsiteUpdate() {
     try {
       localStorage.setItem("nik_data_updated", Date.now().toString());
     } catch {}
+
+    try {
+      if ("BroadcastChannel" in window) {
+        const bc = new BroadcastChannel("nik_live_sync");
+        bc.postMessage({ type: "SYNC_UPDATED", timestamp: Date.now() });
+        bc.close();
+      }
+    } catch {}
   }
 }

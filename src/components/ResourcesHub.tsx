@@ -113,10 +113,21 @@ export default function ResourcesHub({ initialResources, categories }: Resources
     window.addEventListener("focus", handleUpdate);
     document.addEventListener("visibilitychange", handleVisibility);
 
+    let bc: BroadcastChannel | null = null;
+    if ("BroadcastChannel" in window) {
+      try {
+        bc = new BroadcastChannel("nik_live_sync");
+        bc.onmessage = () => {
+          handleUpdate();
+        };
+      } catch {}
+    }
+
     return () => {
       window.removeEventListener("storage", handleStorage);
       window.removeEventListener("focus", handleUpdate);
       document.removeEventListener("visibilitychange", handleVisibility);
+      if (bc) bc.close();
     };
   }, [router]);
 

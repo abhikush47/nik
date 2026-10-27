@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Users, Plus, Trash2, Edit2, X, Loader2, Upload, Check } from "lucide-react";
 import { CommunityProfile } from "@/lib/types";
+import { notifyWebsiteUpdate } from "@/lib/broadcast";
 
 export default function AdminCommunityPage() {
+  const router = useRouter();
   const [profiles, setProfiles] = useState<CommunityProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -25,7 +28,7 @@ export default function AdminCommunityPage() {
 
   const fetchProfiles = async () => {
     try {
-      const res = await fetch("/api/admin/community");
+      const res = await fetch(`/api/admin/community?_t=${Date.now()}`, { cache: "no-store" });
       const data = await res.json();
       if (res.ok) setProfiles(data.items || []);
     } catch (e) {
@@ -93,6 +96,8 @@ export default function AdminCommunityPage() {
         setSuccess("Profile created successfully!");
       }
       setModalOpen(false);
+      notifyWebsiteUpdate();
+      router.refresh();
       fetchProfiles();
     } catch (err: any) {
       setError(err.message || "An error occurred");
@@ -109,6 +114,8 @@ export default function AdminCommunityPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to delete profile");
       setSuccess(`Profile "${name}" deleted.`);
+      notifyWebsiteUpdate();
+      router.refresh();
       fetchProfiles();
     } catch (err: any) {
       setError(err.message || "Failed to delete profile");
@@ -125,6 +132,8 @@ export default function AdminCommunityPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to update publish status");
+      notifyWebsiteUpdate();
+      router.refresh();
       fetchProfiles();
     } catch (err: any) {
       setError(err.message || "Failed to update publish status");

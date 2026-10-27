@@ -951,29 +951,8 @@ export async function getAnnouncementBySlug(slug: string): Promise<Announcement 
 
 export async function createAnnouncement(data: Omit<Announcement, "id" | "created_at" | "updated_at">): Promise<Announcement> {
   const now = new Date().toISOString();
-  const supabase = getSupabaseAdmin();
-  if (supabase) {
-    try {
-      const { data: created, error } = await supabase.from("announcements").insert({
-        ...data,
-        created_at: now,
-        updated_at: now,
-      }).select().single();
-      if (!error && created) {
-        return { ...created, marquee_enabled: Boolean(created.marquee_enabled) };
-      }
-      if (error) {
-        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
-        console.warn("Supabase createAnnouncement error, falling back to SQLite:", error.message);
-      }
-    } catch (e: any) {
-      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
-      console.warn("Supabase createAnnouncement exception, falling back to SQLite:", e?.message || e);
-    }
-  }
-
-  const db = getDb();
   const id = crypto.randomUUID();
+  const db = getDb();
   db.prepare(`
     INSERT INTO announcements (
       id, title, slug, short_message, content, category,
@@ -999,37 +978,32 @@ export async function createAnnouncement(data: Omit<Announcement, "id" | "create
     now
   );
 
-  return {
+  const createdItem: Announcement = {
     id,
     ...data,
+    marquee_enabled: Boolean(data.marquee_enabled),
     created_at: now,
     updated_at: now,
   };
+
+  const supabase = getSupabaseAdmin();
+  if (supabase && !isSupabaseServiceDisabled()) {
+    try {
+      await supabase.from("announcements").upsert({
+        ...createdItem,
+        marquee_enabled: Boolean(createdItem.marquee_enabled),
+      });
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+    }
+  }
+
+  return createdItem;
 }
 
 export async function updateAnnouncement(id: string, data: Partial<Announcement>): Promise<Announcement> {
   const cleanData: any = { ...data };
   if (cleanData.expiry_time === "") cleanData.expiry_time = null;
-
-  const supabase = getSupabaseAdmin();
-  if (supabase) {
-    try {
-      const { data: updated, error } = await supabase.from("announcements").update({
-        ...cleanData,
-        updated_at: new Date().toISOString(),
-      }).eq("id", id).select().single();
-      if (!error && updated) {
-        return { ...updated, marquee_enabled: Boolean(updated.marquee_enabled) };
-      }
-      if (error) {
-        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
-        console.warn("Supabase updateAnnouncement error, falling back to SQLite:", error.message);
-      }
-    } catch (e: any) {
-      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
-      console.warn("Supabase updateAnnouncement exception, falling back to SQLite:", e?.message || e);
-    }
-  }
 
   const db = getDb();
   const existing = db.prepare("SELECT * FROM announcements WHERE id = ?").get(id) as any;
@@ -1037,10 +1011,10 @@ export async function updateAnnouncement(id: string, data: Partial<Announcement>
     throw new Error("Announcement not found");
   }
 
-  const updated = {
+  const updated: Announcement = {
     ...existing,
-    ...data,
-    marquee_enabled: data.marquee_enabled !== undefined ? (data.marquee_enabled ? 1 : 0) : existing.marquee_enabled,
+    ...cleanData,
+    marquee_enabled: cleanData.marquee_enabled !== undefined ? (cleanData.marquee_enabled ? 1 : 0) : existing.marquee_enabled,
     updated_at: new Date().toISOString(),
   };
 
@@ -1068,6 +1042,18 @@ export async function updateAnnouncement(id: string, data: Partial<Announcement>
     id
   );
 
+  const supabase = getSupabaseAdmin();
+  if (supabase && !isSupabaseServiceDisabled()) {
+    try {
+      await supabase.from("announcements").update({
+        ...cleanData,
+        updated_at: updated.updated_at,
+      }).eq("id", id);
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+    }
+  }
+
   return {
     ...updated,
     marquee_enabled: Boolean(updated.marquee_enabled),
@@ -1075,23 +1061,19 @@ export async function updateAnnouncement(id: string, data: Partial<Announcement>
 }
 
 export async function deleteAnnouncement(id: string): Promise<boolean> {
+  const db = getDb();
+  const res = db.prepare("DELETE FROM announcements WHERE id = ?").run(id);
+
   const supabase = getSupabaseAdmin();
-  if (supabase) {
+  if (supabase && !isSupabaseServiceDisabled()) {
     try {
       const { error } = await supabase.from("announcements").delete().eq("id", id);
-      if (!error) return true;
-      if (error) {
-        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
-        console.warn("Supabase deleteAnnouncement error, falling back to SQLite:", error.message);
-      }
+      if (error && isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
     } catch (e: any) {
       if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
-      console.warn("Supabase deleteAnnouncement exception, falling back to SQLite:", e?.message || e);
     }
   }
 
-  const db = getDb();
-  const res = db.prepare("DELETE FROM announcements WHERE id = ?").run(id);
   return res.changes > 0;
 }
 
@@ -1283,29 +1265,8 @@ export async function getEventBySlug(slug: string): Promise<EventItem | null> {
 
 export async function createEvent(data: Omit<EventItem, "id" | "created_at" | "updated_at">): Promise<EventItem> {
   const now = new Date().toISOString();
-  const supabase = getSupabaseAdmin();
-  if (supabase) {
-    try {
-      const { data: created, error } = await supabase.from("events").insert({
-        ...data,
-        created_at: now,
-        updated_at: now,
-      }).select().single();
-      if (!error && created) {
-        return { ...created, featured: Boolean(created.featured) };
-      }
-      if (error) {
-        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
-        console.warn("Supabase createEvent error, falling back to SQLite:", error.message);
-      }
-    } catch (e: any) {
-      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
-      console.warn("Supabase createEvent exception, falling back to SQLite:", e?.message || e);
-    }
-  }
-
-  const db = getDb();
   const id = crypto.randomUUID();
+  const db = getDb();
   db.prepare(`
     INSERT INTO events (
       id, slug, title, summary, description, cover_image, poster_image,
@@ -1337,38 +1298,33 @@ export async function createEvent(data: Omit<EventItem, "id" | "created_at" | "u
     now
   );
 
-  return {
+  const createdItem: EventItem = {
     id,
     ...data,
+    featured: Boolean(data.featured),
     created_at: now,
     updated_at: now,
   };
+
+  const supabase = getSupabaseAdmin();
+  if (supabase && !isSupabaseServiceDisabled()) {
+    try {
+      await supabase.from("events").upsert({
+        ...createdItem,
+        featured: Boolean(createdItem.featured),
+      });
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+    }
+  }
+
+  return createdItem;
 }
 
 export async function updateEvent(id: string, data: Partial<EventItem>): Promise<EventItem> {
   const cleanData: any = { ...data };
   if (cleanData.registration_deadline === "") cleanData.registration_deadline = null;
   if (cleanData.end_date === "") cleanData.end_date = null;
-
-  const supabase = getSupabaseAdmin();
-  if (supabase) {
-    try {
-      const { data: updated, error } = await supabase.from("events").update({
-        ...cleanData,
-        updated_at: new Date().toISOString(),
-      }).eq("id", id).select().single();
-      if (!error && updated) {
-        return { ...updated, featured: Boolean(updated.featured) };
-      }
-      if (error) {
-        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
-        console.warn("Supabase updateEvent error, falling back to SQLite:", error.message);
-      }
-    } catch (e: any) {
-      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
-      console.warn("Supabase updateEvent exception, falling back to SQLite:", e?.message || e);
-    }
-  }
 
   const db = getDb();
   const existing = db.prepare("SELECT * FROM events WHERE id = ?").get(id) as any;
@@ -1378,12 +1334,12 @@ export async function updateEvent(id: string, data: Partial<EventItem>): Promise
 
   const updated = {
     ...existing,
-    ...data,
+    ...cleanData,
     registration_deadline:
-      data.registration_deadline !== undefined
-        ? (data.registration_deadline ? String(data.registration_deadline).trim() : null)
+      cleanData.registration_deadline !== undefined
+        ? (cleanData.registration_deadline ? String(cleanData.registration_deadline).trim() : null)
         : existing.registration_deadline,
-    featured: data.featured !== undefined ? (data.featured ? 1 : 0) : existing.featured,
+    featured: cleanData.featured !== undefined ? (cleanData.featured ? 1 : 0) : existing.featured,
     updated_at: new Date().toISOString(),
   };
 
@@ -1418,6 +1374,18 @@ export async function updateEvent(id: string, data: Partial<EventItem>): Promise
     id
   );
 
+  const supabase = getSupabaseAdmin();
+  if (supabase && !isSupabaseServiceDisabled()) {
+    try {
+      await supabase.from("events").update({
+        ...cleanData,
+        updated_at: updated.updated_at,
+      }).eq("id", id);
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+    }
+  }
+
   return {
     ...updated,
     featured: Boolean(updated.featured),
@@ -1425,23 +1393,19 @@ export async function updateEvent(id: string, data: Partial<EventItem>): Promise
 }
 
 export async function deleteEvent(id: string): Promise<boolean> {
+  const db = getDb();
+  const res = db.prepare("DELETE FROM events WHERE id = ?").run(id);
+
   const supabase = getSupabaseAdmin();
-  if (supabase) {
+  if (supabase && !isSupabaseServiceDisabled()) {
     try {
       const { error } = await supabase.from("events").delete().eq("id", id);
-      if (!error) return true;
-      if (error) {
-        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
-        console.warn("Supabase deleteEvent error, falling back to SQLite:", error.message);
-      }
+      if (error && isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
     } catch (e: any) {
       if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
-      console.warn("Supabase deleteEvent exception, falling back to SQLite:", e?.message || e);
     }
   }
 
-  const db = getDb();
-  const res = db.prepare("DELETE FROM events WHERE id = ?").run(id);
   return res.changes > 0;
 }
 
@@ -2460,23 +2424,19 @@ export async function updateCommunityProfile(id: string, data: Partial<Community
 }
 
 export async function deleteCommunityProfile(id: string): Promise<boolean> {
+  const db = getDb();
+  const res = db.prepare("DELETE FROM community_profiles WHERE id = ?").run(id);
+
   const supabase = getSupabaseAdmin();
-  if (supabase) {
+  if (supabase && !isSupabaseServiceDisabled()) {
     try {
       const { error } = await supabase.from("community_profiles").delete().eq("id", id);
-      if (!error) return true;
-      if (error) {
-        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
-        console.warn("Supabase deleteCommunityProfile error, falling back to SQLite:", error.message);
-      }
+      if (error && isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
     } catch (e: any) {
       if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
-      console.warn("Supabase deleteCommunityProfile exception, falling back to SQLite:", e?.message || e);
     }
   }
 
-  const db = getDb();
-  const res = db.prepare("DELETE FROM community_profiles WHERE id = ?").run(id);
   return res.changes > 0;
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Megaphone, X, ExternalLink, ChevronRight } from "lucide-react";
 import { Announcement } from "@/lib/types";
@@ -12,6 +12,7 @@ interface AnnouncementTickerProps {
 
 export default function AnnouncementTicker({ announcements: initialAnnouncements }: AnnouncementTickerProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [items, setItems] = useState<Announcement[]>(initialAnnouncements || []);
   const [dismissed, setDismissed] = useState(false);
 
@@ -44,19 +45,41 @@ export default function AnnouncementTicker({ announcements: initialAnnouncements
 
     window.addEventListener("storage", handleStorage);
     window.addEventListener("focus", handleFocus);
+
+    let bc: BroadcastChannel | null = null;
+    if ("BroadcastChannel" in window) {
+      try {
+        bc = new BroadcastChannel("nik_live_sync");
+        bc.onmessage = () => {
+          fetchLatest();
+          router.refresh();
+        };
+      } catch {}
+    }
+
     return () => {
       window.removeEventListener("storage", handleStorage);
       window.removeEventListener("focus", handleFocus);
+      if (bc) bc.close();
     };
   }, [router]);
+
+  // Never render public announcement ticker inside the Admin CMS Portal
+  if (pathname.startsWith("/admin")) {
+    return null;
+  }
 
   if (dismissed || !items || items.length === 0) {
     return null;
   }
 
   // Filter only published announcements with marquee_enabled
-  const activeItems = items.filter((a) => a.marquee_enabled);
-  const itemsToDisplay = activeItems.length > 0 ? activeItems : items;
+  const activeItems = items.filter((a) => a.marquee_enabled && a.status === "published");
+  if (activeItems.length === 0) {
+    return null;
+  }
+
+  const itemsToDisplay = activeItems;
 
   // Duplicate items for continuous seamless marquee loop
   const displayItems =

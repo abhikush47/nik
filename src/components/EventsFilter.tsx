@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { Calendar, MapPin, Search, ArrowRight, CheckCircle, Clock } from "lucide-react";
@@ -19,16 +20,70 @@ const CATEGORIES = [
 ];
 
 export default function EventsFilter({ initialEvents }: EventsFilterProps) {
+  const router = useRouter();
+  const [events, setEvents] = useState<EventItem[]>(initialEvents || []);
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    setEvents(initialEvents || []);
+  }, [initialEvents]);
+
+  // Real-time zero-delay cross-tab listener
+  useEffect(() => {
+    const fetchLatest = async () => {
+      try {
+        const res = await fetch(`/api/events?_t=${Date.now()}`, { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.events)) setEvents(data.events);
+        }
+      } catch {}
+    };
+
+    const handleUpdate = () => {
+      fetchLatest();
+      router.refresh();
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "nik_data_updated") {
+        handleUpdate();
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("focus", handleUpdate);
+    const visHandler = () => {
+      if (document.visibilityState === "visible") handleUpdate();
+    };
+    document.addEventListener("visibilitychange", visHandler);
+
+    let bc: BroadcastChannel | null = null;
+    if ("BroadcastChannel" in window) {
+      try {
+        bc = new BroadcastChannel("nik_live_sync");
+        bc.onmessage = () => {
+          handleUpdate();
+        };
+      } catch {}
+    }
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("focus", handleUpdate);
+      document.removeEventListener("visibilitychange", visHandler);
+      if (bc) bc.close();
+    };
+  }, [router]);
 
   const { upcomingList, pastList } = useMemo(() => {
     const currentTime = new Date();
     const upcoming: EventItem[] = [];
     const past: EventItem[] = [];
 
-    for (const ev of initialEvents) {
+    for (const ev of events) {
       const evDate = new Date(ev.start_date);
       if (ev.status === "past" || evDate < currentTime) {
         past.push(ev);
@@ -41,7 +96,7 @@ export default function EventsFilter({ initialEvents }: EventsFilterProps) {
       upcomingList: upcoming.sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()),
       pastList: past.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime()),
     };
-  }, [initialEvents]);
+  }, [events]);
 
   const activeList = tab === "upcoming" ? upcomingList : pastList;
 

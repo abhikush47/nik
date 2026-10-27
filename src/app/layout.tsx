@@ -4,6 +4,7 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import AnnouncementTicker from "@/components/AnnouncementTicker";
+import LiveRefreshProvider from "@/components/LiveRefreshProvider";
 import { getActiveMarqueeAnnouncements, getSiteSettings } from "@/lib/db";
 import { Announcement } from "@/lib/types";
 
@@ -106,6 +107,7 @@ export default async function RootLayout({
         <script src="/arcade.js" async />
       </head>
       <body className="min-h-full flex flex-col bg-white text-[#17231B] selection:bg-[#0B3D2E] selection:text-white">
+        <LiveRefreshProvider />
         <AnnouncementTicker announcements={announcements} />
         <Navbar />
         <main className="flex-1">{children}</main>
