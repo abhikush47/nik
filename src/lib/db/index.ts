@@ -3,7 +3,12 @@ import path from "path";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import Database from "better-sqlite3";
-import { getSupabaseAdmin } from "../supabase";
+import {
+  getSupabaseAdmin,
+  disableSupabaseService,
+  isQuotaOrRestrictionError,
+  isSupabaseServiceDisabled,
+} from "../supabase";
 import {
   AdminUser,
   SiteSettings,
@@ -761,12 +766,20 @@ function seedSQLiteInitialData(db: Database.Database) {
 let supabaseSeededChecked = false;
 
 async function ensureSupabaseSeeded(supabase: NonNullable<ReturnType<typeof getSupabaseAdmin>>) {
-  if (supabaseSeededChecked) return;
+  if (supabaseSeededChecked || isSupabaseServiceDisabled()) return;
   supabaseSeededChecked = true;
 
   try {
-    const { count } = await supabase.from("site_settings").select("*", { count: "exact", head: true });
-    if (count === 0 || count === null) {
+    const { count, error } = await supabase.from("site_settings").select("*", { count: "exact", head: true });
+    if (error) {
+      if (isQuotaOrRestrictionError(error)) {
+        disableSupabaseService(error.message);
+      } else {
+        console.warn("Supabase auto-seed check non-critical warning:", error.message);
+      }
+      return;
+    }
+    if (count === 0) {
       const now = new Date().toISOString();
       const passwordHash = bcrypt.hashSync("AdminNik2026!", 10);
 
@@ -824,8 +837,12 @@ async function ensureSupabaseSeeded(supabase: NonNullable<ReturnType<typeof getS
         await supabase.from("page_content").upsert(c, { onConflict: "key" });
       }
     }
-  } catch (err) {
-    console.warn("Supabase auto-seed check non-critical warning:", err);
+  } catch (err: any) {
+    if (isQuotaOrRestrictionError(err)) {
+      disableSupabaseService(err?.message || String(err));
+    } else {
+      console.warn("Supabase auto-seed check non-critical warning:", err);
+    }
   }
 }
 
@@ -836,14 +853,23 @@ async function ensureSupabaseSeeded(supabase: NonNullable<ReturnType<typeof getS
 export async function getSiteSettings(): Promise<SiteSettings> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    await ensureSupabaseSeeded(supabase);
-    const { data, error } = await supabase.from("site_settings").select("*").eq("id", "default").maybeSingle();
-    if (!error && data) {
-      return {
-        ...data,
-        marquee_ticker_enabled: Boolean(data.marquee_ticker_enabled),
-        maintenance_mode: Boolean(data.maintenance_mode),
-      };
+    try {
+      await ensureSupabaseSeeded(supabase);
+      const { data, error } = await supabase.from("site_settings").select("*").eq("id", "default").maybeSingle();
+      if (!error && data) {
+        return {
+          ...data,
+          marquee_ticker_enabled: Boolean(data.marquee_ticker_enabled),
+          maintenance_mode: Boolean(data.maintenance_mode),
+        };
+      }
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getSiteSettings error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getSiteSettings exception, falling back to SQLite:", e?.message || e);
     }
   }
 
@@ -862,74 +888,69 @@ export async function getSiteSettings(): Promise<SiteSettings> {
 export async function updateSiteSettings(settings: Partial<SiteSettings>): Promise<SiteSettings> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const current = await getSiteSettings();
-    const updated: SiteSettings = {
-      ...current,
-      ...settings,
-      updated_at: new Date().toISOString(),
-    };
-    const { data, error } = await supabase.from("site_settings").update(updated).eq("id", "default").select().single();
-    if (error) {
-      console.error("Supabase updateSiteSettings error:", error);
-      throw new Error(`Failed to update site settings: ${error.message}`);
+    try {
+      const current = await getSiteSettings();
+      const updated: SiteSettings = {
+        ...current,
+        ...settings,
+        updated_at: new Date().toISOString(),
+      };
+      const { data, error } = await supabase.from("site_settings").update(updated).eq("id", "default").select().single();
+      if (!error && data) {
+        return {
+          ...data,
+          marquee_ticker_enabled: Boolean(data.marquee_ticker_enabled),
+          maintenance_mode: Boolean(data.maintenance_mode),
+        };
+      }
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase updateSiteSettings error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase updateSiteSettings exception, falling back to SQLite:", e?.message || e);
     }
-    return {
-      ...data,
-      marquee_ticker_enabled: Boolean(data.marquee_ticker_enabled),
-      maintenance_mode: Boolean(data.maintenance_mode),
-    };
   }
 
   const db = getDb();
-  const current = await getSiteSettings();
-  const updated: SiteSettings = {
+  const current = db.prepare("SELECT * FROM site_settings WHERE id = 'default'").get() as any;
+  if (!current) {
+    throw new Error("Site settings record missing");
+  }
+
+  const updated = {
     ...current,
     ...settings,
+    marquee_ticker_enabled: settings.marquee_ticker_enabled !== undefined ? (settings.marquee_ticker_enabled ? 1 : 0) : current.marquee_ticker_enabled,
+    maintenance_mode: settings.maintenance_mode !== undefined ? (settings.maintenance_mode ? 1 : 0) : current.maintenance_mode,
     updated_at: new Date().toISOString(),
   };
 
   db.prepare(`
     UPDATE site_settings SET
-      community_name = ?,
-      short_name = ?,
-      tagline = ?,
-      core_message = ?,
-      hero_headline = ?,
-      hero_description = ?,
-      footer_text = ?,
-      contact_email = ?,
-      contact_phone = ?,
-      contact_location = ?,
-      instagram_url = ?,
-      marquee_ticker_enabled = ?,
-      marquee_ticker_speed = ?,
-      maintenance_mode = ?,
-      meta_title = ?,
-      meta_description = ?,
-      updated_at = ?
+      community_name = ?, short_name = ?, tagline = ?, core_message = ?,
+      hero_headline = ?, hero_description = ?, footer_text = ?,
+      contact_email = ?, contact_phone = ?, contact_location = ?, instagram_url = ?,
+      marquee_ticker_enabled = ?, marquee_ticker_speed = ?, maintenance_mode = ?,
+      meta_title = ?, meta_description = ?, updated_at = ?
     WHERE id = 'default'
   `).run(
-    updated.community_name,
-    updated.short_name,
-    updated.tagline,
-    updated.core_message,
-    updated.hero_headline,
-    updated.hero_description,
-    updated.footer_text,
-    updated.contact_email,
-    updated.contact_phone,
-    updated.contact_location,
-    updated.instagram_url,
-    updated.marquee_ticker_enabled ? 1 : 0,
-    updated.marquee_ticker_speed,
-    updated.maintenance_mode ? 1 : 0,
-    updated.meta_title,
-    updated.meta_description,
-    updated.updated_at
+    updated.community_name, updated.short_name, updated.tagline, updated.core_message,
+    updated.hero_headline, updated.hero_description, updated.footer_text,
+    updated.contact_email, updated.contact_phone, updated.contact_location, updated.instagram_url,
+    updated.marquee_ticker_enabled, updated.marquee_ticker_speed, updated.maintenance_mode,
+    updated.meta_title, updated.meta_description, updated.updated_at
   );
 
-  return updated;
+  return {
+    ...updated,
+    marquee_ticker_enabled: Boolean(updated.marquee_ticker_enabled),
+    maintenance_mode: Boolean(updated.maintenance_mode),
+  };
 }
+
+
 
 // ==============================================================================
 // 2. ANNOUNCEMENTS REPOSITORY
@@ -938,20 +959,27 @@ export async function updateSiteSettings(settings: Partial<SiteSettings>): Promi
 export async function getAnnouncements(options?: { onlyPublished?: boolean; marqueeOnly?: boolean }): Promise<Announcement[]> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    await ensureSupabaseSeeded(supabase);
-    let query = supabase.from("announcements").select("*");
-    if (options?.onlyPublished) query = query.eq("status", "published");
-    if (options?.marqueeOnly) query = query.eq("marquee_enabled", true);
-    query = query.order("display_order", { ascending: true }).order("created_at", { ascending: false });
-    const { data, error } = await query;
-    if (error) {
-      console.error("Supabase getAnnouncements error:", error);
-      throw error;
+    try {
+      await ensureSupabaseSeeded(supabase);
+      let query = supabase.from("announcements").select("*");
+      if (options?.onlyPublished) query = query.eq("status", "published");
+      if (options?.marqueeOnly) query = query.eq("marquee_enabled", true);
+      query = query.order("display_order", { ascending: true }).order("created_at", { ascending: false });
+      const { data, error } = await query;
+      if (!error && data) {
+        return (data || []).map((r) => ({
+          ...r,
+          marquee_enabled: Boolean(r.marquee_enabled),
+        }));
+      }
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getAnnouncements error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getAnnouncements exception, falling back to SQLite:", e?.message || e);
     }
-    return (data || []).map((r) => ({
-      ...r,
-      marquee_enabled: Boolean(r.marquee_enabled),
-    }));
   }
 
   const db = getDb();
@@ -986,8 +1014,19 @@ export async function getActiveMarqueeAnnouncements(): Promise<Announcement[]> {
 export async function getAnnouncementBySlug(slug: string): Promise<Announcement | null> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { data } = await supabase.from("announcements").select("*").eq("slug", slug).maybeSingle();
-    return data ? { ...data, marquee_enabled: Boolean(data.marquee_enabled) } : null;
+    try {
+      const { data, error } = await supabase.from("announcements").select("*").eq("slug", slug).maybeSingle();
+      if (!error && data) {
+        return { ...data, marquee_enabled: Boolean(data.marquee_enabled) };
+      }
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getAnnouncementBySlug error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getAnnouncementBySlug exception, falling back to SQLite:", e?.message || e);
+    }
   }
 
   const db = getDb();
@@ -1003,16 +1042,23 @@ export async function createAnnouncement(data: Omit<Announcement, "id" | "create
   const now = new Date().toISOString();
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { data: created, error } = await supabase.from("announcements").insert({
-      ...data,
-      created_at: now,
-      updated_at: now,
-    }).select().single();
-    if (error) {
-      console.error("Supabase createAnnouncement error:", error);
-      throw new Error(`Failed to create announcement: ${error.message}`);
+    try {
+      const { data: created, error } = await supabase.from("announcements").insert({
+        ...data,
+        created_at: now,
+        updated_at: now,
+      }).select().single();
+      if (!error && created) {
+        return { ...created, marquee_enabled: Boolean(created.marquee_enabled) };
+      }
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase createAnnouncement error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase createAnnouncement exception, falling back to SQLite:", e?.message || e);
     }
-    return { ...created, marquee_enabled: Boolean(created.marquee_enabled) };
   }
 
   const db = getDb();
@@ -1056,15 +1102,22 @@ export async function updateAnnouncement(id: string, data: Partial<Announcement>
 
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { data: updated, error } = await supabase.from("announcements").update({
-      ...cleanData,
-      updated_at: new Date().toISOString(),
-    }).eq("id", id).select().single();
-    if (error) {
-      console.error("Supabase updateAnnouncement error:", error);
-      throw new Error(`Failed to update announcement: ${error.message}`);
+    try {
+      const { data: updated, error } = await supabase.from("announcements").update({
+        ...cleanData,
+        updated_at: new Date().toISOString(),
+      }).eq("id", id).select().single();
+      if (!error && updated) {
+        return { ...updated, marquee_enabled: Boolean(updated.marquee_enabled) };
+      }
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase updateAnnouncement error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase updateAnnouncement exception, falling back to SQLite:", e?.message || e);
     }
-    return { ...updated, marquee_enabled: Boolean(updated.marquee_enabled) };
   }
 
   const db = getDb();
@@ -1113,12 +1166,17 @@ export async function updateAnnouncement(id: string, data: Partial<Announcement>
 export async function deleteAnnouncement(id: string): Promise<boolean> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { error } = await supabase.from("announcements").delete().eq("id", id);
-    if (error) {
-      console.error("Supabase deleteAnnouncement error:", error);
-      throw new Error(`Failed to delete announcement: ${error.message}`);
+    try {
+      const { error } = await supabase.from("announcements").delete().eq("id", id);
+      if (!error) return true;
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase deleteAnnouncement error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase deleteAnnouncement exception, falling back to SQLite:", e?.message || e);
     }
-    return true;
   }
 
   const db = getDb();
@@ -1133,17 +1191,24 @@ export async function deleteAnnouncement(id: string): Promise<boolean> {
 export async function getEvents(options?: { onlyPublished?: boolean; category?: string }): Promise<EventItem[]> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    await ensureSupabaseSeeded(supabase);
-    let query = supabase.from("events").select("*");
-    if (options?.onlyPublished) query = query.in("status", ["published", "past"]);
-    if (options?.category && options.category !== "All") query = query.eq("category", options.category);
-    query = query.order("start_date", { ascending: true });
-    const { data, error } = await query;
-    if (error) {
-      console.error("Supabase getEvents error:", error);
-      throw error;
+    try {
+      await ensureSupabaseSeeded(supabase);
+      let query = supabase.from("events").select("*");
+      if (options?.onlyPublished) query = query.in("status", ["published", "past"]);
+      if (options?.category && options.category !== "All") query = query.eq("category", options.category);
+      query = query.order("start_date", { ascending: true });
+      const { data, error } = await query;
+      if (!error && data) {
+        return (data || []).map((r) => ({ ...r, featured: Boolean(r.featured) }));
+      }
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getEvents error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getEvents exception, falling back to SQLite:", e?.message || e);
     }
-    return (data || []).map((r) => ({ ...r, featured: Boolean(r.featured) }));
   }
 
   const db = getDb();
@@ -1175,14 +1240,24 @@ export async function getEvents(options?: { onlyPublished?: boolean; category?: 
 export async function getUpcomingEvents(): Promise<EventItem[]> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    await ensureSupabaseSeeded(supabase);
-    const now = new Date().toISOString();
-    const { data, error } = await supabase.from("events").select("*")
-      .eq("status", "published")
-      .gte("start_date", now)
-      .order("start_date", { ascending: true });
-    if (error) throw error;
-    return (data || []).map((r) => ({ ...r, featured: Boolean(r.featured) }));
+    try {
+      await ensureSupabaseSeeded(supabase);
+      const now = new Date().toISOString();
+      const { data, error } = await supabase.from("events").select("*")
+        .eq("status", "published")
+        .gte("start_date", now)
+        .order("start_date", { ascending: true });
+      if (!error && data) {
+        return (data || []).map((r) => ({ ...r, featured: Boolean(r.featured) }));
+      }
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getUpcomingEvents error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getUpcomingEvents exception, falling back to SQLite:", e?.message || e);
+    }
   }
 
   const db = getDb();
@@ -1197,14 +1272,24 @@ export async function getUpcomingEvents(): Promise<EventItem[]> {
 export async function getPastEvents(): Promise<EventItem[]> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    await ensureSupabaseSeeded(supabase);
-    const now = new Date().toISOString();
-    const { data, error } = await supabase.from("events").select("*")
-      .in("status", ["published", "past"])
-      .lt("start_date", now)
-      .order("start_date", { ascending: false });
-    if (error) throw error;
-    return (data || []).map((r) => ({ ...r, featured: Boolean(r.featured) }));
+    try {
+      await ensureSupabaseSeeded(supabase);
+      const now = new Date().toISOString();
+      const { data, error } = await supabase.from("events").select("*")
+        .in("status", ["published", "past"])
+        .lt("start_date", now)
+        .order("start_date", { ascending: false });
+      if (!error && data) {
+        return (data || []).map((r) => ({ ...r, featured: Boolean(r.featured) }));
+      }
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getPastEvents error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getPastEvents exception, falling back to SQLite:", e?.message || e);
+    }
   }
 
   const db = getDb();
@@ -1219,20 +1304,31 @@ export async function getPastEvents(): Promise<EventItem[]> {
 export async function getFeaturedEvent(): Promise<EventItem | null> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    await ensureSupabaseSeeded(supabase);
-    const { data } = await supabase.from("events").select("*")
-      .eq("status", "published")
-      .eq("featured", true)
-      .order("start_date", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    if (data) return { ...data, featured: Boolean(data.featured) };
-    const { data: fallback } = await supabase.from("events").select("*")
-      .eq("status", "published")
-      .order("start_date", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    return fallback ? { ...fallback, featured: Boolean(fallback.featured) } : null;
+    try {
+      await ensureSupabaseSeeded(supabase);
+      const { data, error } = await supabase.from("events").select("*")
+        .eq("status", "published")
+        .eq("featured", true)
+        .order("start_date", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (!error && data) return { ...data, featured: Boolean(data.featured) };
+      if (!error) {
+        const { data: fallback } = await supabase.from("events").select("*")
+          .eq("status", "published")
+          .order("start_date", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (fallback) return { ...fallback, featured: Boolean(fallback.featured) };
+      }
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getFeaturedEvent error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getFeaturedEvent exception, falling back to SQLite:", e?.message || e);
+    }
   }
 
   const db = getDb();
@@ -1255,8 +1351,17 @@ export async function getFeaturedEvent(): Promise<EventItem | null> {
 export async function getEventBySlug(slug: string): Promise<EventItem | null> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { data } = await supabase.from("events").select("*").eq("slug", slug).maybeSingle();
-    return data ? { ...data, featured: Boolean(data.featured) } : null;
+    try {
+      const { data, error } = await supabase.from("events").select("*").eq("slug", slug).maybeSingle();
+      if (!error && data) return { ...data, featured: Boolean(data.featured) };
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getEventBySlug error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getEventBySlug exception, falling back to SQLite:", e?.message || e);
+    }
   }
 
   const db = getDb();
@@ -1269,16 +1374,23 @@ export async function createEvent(data: Omit<EventItem, "id" | "created_at" | "u
   const now = new Date().toISOString();
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { data: created, error } = await supabase.from("events").insert({
-      ...data,
-      created_at: now,
-      updated_at: now,
-    }).select().single();
-    if (error) {
-      console.error("Supabase createEvent error:", error);
-      throw new Error(`Failed to create event: ${error.message}`);
+    try {
+      const { data: created, error } = await supabase.from("events").insert({
+        ...data,
+        created_at: now,
+        updated_at: now,
+      }).select().single();
+      if (!error && created) {
+        return { ...created, featured: Boolean(created.featured) };
+      }
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase createEvent error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase createEvent exception, falling back to SQLite:", e?.message || e);
     }
-    return { ...created, featured: Boolean(created.featured) };
   }
 
   const db = getDb();
@@ -1329,15 +1441,22 @@ export async function updateEvent(id: string, data: Partial<EventItem>): Promise
 
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { data: updated, error } = await supabase.from("events").update({
-      ...cleanData,
-      updated_at: new Date().toISOString(),
-    }).eq("id", id).select().single();
-    if (error) {
-      console.error("Supabase updateEvent error:", error);
-      throw new Error(`Failed to update event: ${error.message}`);
+    try {
+      const { data: updated, error } = await supabase.from("events").update({
+        ...cleanData,
+        updated_at: new Date().toISOString(),
+      }).eq("id", id).select().single();
+      if (!error && updated) {
+        return { ...updated, featured: Boolean(updated.featured) };
+      }
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase updateEvent error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase updateEvent exception, falling back to SQLite:", e?.message || e);
     }
-    return { ...updated, featured: Boolean(updated.featured) };
   }
 
   const db = getDb();
@@ -1397,18 +1516,24 @@ export async function updateEvent(id: string, data: Partial<EventItem>): Promise
 export async function deleteEvent(id: string): Promise<boolean> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { error } = await supabase.from("events").delete().eq("id", id);
-    if (error) {
-      console.error("Supabase deleteEvent error:", error);
-      throw new Error(`Failed to delete event: ${error.message}`);
+    try {
+      const { error } = await supabase.from("events").delete().eq("id", id);
+      if (!error) return true;
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase deleteEvent error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase deleteEvent exception, falling back to SQLite:", e?.message || e);
     }
-    return true;
   }
 
   const db = getDb();
   const res = db.prepare("DELETE FROM events WHERE id = ?").run(id);
   return res.changes > 0;
 }
+
 
 // ==============================================================================
 // 4. GALLERY REPOSITORY (Robust Supabase Storage + PostgreSQL & SQLite)
@@ -1417,10 +1542,18 @@ export async function deleteEvent(id: string): Promise<boolean> {
 export async function getGalleryCategories(): Promise<GalleryCategory[]> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    await ensureSupabaseSeeded(supabase);
-    const { data, error } = await supabase.from("gallery_categories").select("*").order("display_order", { ascending: true });
-    if (error) throw error;
-    return data || [];
+    try {
+      await ensureSupabaseSeeded(supabase);
+      const { data, error } = await supabase.from("gallery_categories").select("*").order("display_order", { ascending: true });
+      if (!error && data) return data;
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getGalleryCategories error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getGalleryCategories exception, falling back to SQLite:", e?.message || e);
+    }
   }
 
   const db = getDb();
@@ -1431,17 +1564,25 @@ export async function createGalleryCategory(name: string, slug: string, descript
   const now = new Date().toISOString();
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { data: countData } = await supabase.from("gallery_categories").select("display_order").order("display_order", { ascending: false }).limit(1);
-    const nextOrder = (countData?.[0]?.display_order || 0) + 1;
-    const { data: created, error } = await supabase.from("gallery_categories").insert({
-      name,
-      slug,
-      description: description || null,
-      display_order: nextOrder,
-      created_at: now,
-    }).select().single();
-    if (error) throw error;
-    return created;
+    try {
+      const { data: countData } = await supabase.from("gallery_categories").select("display_order").order("display_order", { ascending: false }).limit(1);
+      const nextOrder = (countData?.[0]?.display_order || 0) + 1;
+      const { data: created, error } = await supabase.from("gallery_categories").insert({
+        name,
+        slug,
+        description: description || null,
+        display_order: nextOrder,
+        created_at: now,
+      }).select().single();
+      if (!error && created) return created;
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase createGalleryCategory error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase createGalleryCategory exception, falling back to SQLite:", e?.message || e);
+    }
   }
 
   const db = getDb();
@@ -1456,14 +1597,22 @@ export async function createGalleryCategory(name: string, slug: string, descript
 export async function getGalleryImages(options?: { onlyPublished?: boolean; categorySlug?: string }): Promise<GalleryImage[]> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    await ensureSupabaseSeeded(supabase);
-    let query = supabase.from("gallery_images").select("*");
-    if (options?.onlyPublished) query = query.eq("status", "published");
-    if (options?.categorySlug && options.categorySlug !== "all") query = query.eq("category_slug", options.categorySlug);
-    query = query.order("display_order", { ascending: true }).order("created_at", { ascending: false });
-    const { data, error } = await query;
-    if (error) throw error;
-    return (data || []).map((r) => ({ ...r, featured: Boolean(r.featured) }));
+    try {
+      await ensureSupabaseSeeded(supabase);
+      let query = supabase.from("gallery_images").select("*");
+      if (options?.onlyPublished) query = query.eq("status", "published");
+      if (options?.categorySlug && options.categorySlug !== "all") query = query.eq("category_slug", options.categorySlug);
+      query = query.order("display_order", { ascending: true }).order("created_at", { ascending: false });
+      const { data, error } = await query;
+      if (!error && data) return (data || []).map((r) => ({ ...r, featured: Boolean(r.featured) }));
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getGalleryImages error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getGalleryImages exception, falling back to SQLite:", e?.message || e);
+    }
   }
 
   const db = getDb();
@@ -1495,15 +1644,23 @@ export async function getGalleryImages(options?: { onlyPublished?: boolean; cate
 export async function getFeaturedGalleryImages(): Promise<GalleryImage[]> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    await ensureSupabaseSeeded(supabase);
-    const { data, error } = await supabase.from("gallery_images").select("*")
-      .eq("status", "published")
-      .eq("featured", true)
-      .order("display_order", { ascending: true })
-      .order("created_at", { ascending: false })
-      .limit(6);
-    if (error) throw error;
-    return (data || []).map((r) => ({ ...r, featured: Boolean(r.featured) }));
+    try {
+      await ensureSupabaseSeeded(supabase);
+      const { data, error } = await supabase.from("gallery_images").select("*")
+        .eq("status", "published")
+        .eq("featured", true)
+        .order("display_order", { ascending: true })
+        .order("created_at", { ascending: false })
+        .limit(6);
+      if (!error && data) return (data || []).map((r) => ({ ...r, featured: Boolean(r.featured) }));
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getFeaturedGalleryImages error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getFeaturedGalleryImages exception, falling back to SQLite:", e?.message || e);
+    }
   }
 
   const db = getDb();
@@ -1520,16 +1677,21 @@ export async function createGalleryImage(data: Omit<GalleryImage, "id" | "create
   const now = new Date().toISOString();
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { data: created, error } = await supabase.from("gallery_images").insert({
-      ...data,
-      created_at: now,
-      updated_at: now,
-    }).select().single();
-    if (error) {
-      console.error("Supabase createGalleryImage error:", error);
-      throw new Error(`Failed to add photo: ${error.message}`);
+    try {
+      const { data: created, error } = await supabase.from("gallery_images").insert({
+        ...data,
+        created_at: now,
+        updated_at: now,
+      }).select().single();
+      if (!error && created) return { ...created, featured: Boolean(created.featured) };
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase createGalleryImage error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase createGalleryImage exception, falling back to SQLite:", e?.message || e);
     }
-    return { ...created, featured: Boolean(created.featured) };
   }
 
   const db = getDb();
@@ -1566,15 +1728,20 @@ export async function createGalleryImage(data: Omit<GalleryImage, "id" | "create
 export async function updateGalleryImage(id: string, data: Partial<GalleryImage>): Promise<GalleryImage> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { data: updated, error } = await supabase.from("gallery_images").update({
-      ...data,
-      updated_at: new Date().toISOString(),
-    }).eq("id", id).select().single();
-    if (error) {
-      console.error("Supabase updateGalleryImage error:", error);
-      throw new Error(`Failed to update photo: ${error.message}`);
+    try {
+      const { data: updated, error } = await supabase.from("gallery_images").update({
+        ...data,
+        updated_at: new Date().toISOString(),
+      }).eq("id", id).select().single();
+      if (!error && updated) return { ...updated, featured: Boolean(updated.featured) };
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase updateGalleryImage error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase updateGalleryImage exception, falling back to SQLite:", e?.message || e);
     }
-    return { ...updated, featured: Boolean(updated.featured) };
   }
 
   const db = getDb();
@@ -1653,13 +1820,17 @@ export async function deleteGalleryImage(id: string): Promise<boolean> {
     }
 
     // 3. Delete from database
-    const { error: delErr } = await supabase.from("gallery_images").delete().eq("id", id);
-    if (delErr) {
-      console.error("Supabase gallery deletion error:", delErr);
-      throw new Error(`Database error: ${delErr.message}`);
+    try {
+      const { error: delErr } = await supabase.from("gallery_images").delete().eq("id", id);
+      if (!delErr) return true;
+      if (delErr) {
+        if (isQuotaOrRestrictionError(delErr)) disableSupabaseService(delErr.message);
+        console.warn("Supabase gallery deletion error, falling back to SQLite:", delErr.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase gallery deletion exception, falling back to SQLite:", e?.message || e);
     }
-
-    return true;
   }
 
   // SQLite fallback:
@@ -2133,13 +2304,21 @@ export async function deleteResource(id: string): Promise<boolean> {
 export async function getCommunityProfiles(options?: { onlyPublished?: boolean }): Promise<CommunityProfile[]> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    await ensureSupabaseSeeded(supabase);
-    let query = supabase.from("community_profiles").select("*");
-    if (options?.onlyPublished) query = query.eq("is_published", true);
-    query = query.order("display_order", { ascending: true }).order("created_at", { ascending: true });
-    const { data, error } = await query;
-    if (error) throw error;
-    return (data || []).map((r) => ({ ...r, is_published: Boolean(r.is_published) }));
+    try {
+      await ensureSupabaseSeeded(supabase);
+      let query = supabase.from("community_profiles").select("*");
+      if (options?.onlyPublished) query = query.eq("is_published", true);
+      query = query.order("display_order", { ascending: true }).order("created_at", { ascending: true });
+      const { data, error } = await query;
+      if (!error && data) return (data || []).map((r) => ({ ...r, is_published: Boolean(r.is_published) }));
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getCommunityProfiles error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getCommunityProfiles exception, falling back to SQLite:", e?.message || e);
+    }
   }
 
   const db = getDb();
@@ -2159,16 +2338,21 @@ export async function createCommunityProfile(data: Omit<CommunityProfile, "id" |
   const now = new Date().toISOString();
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { data: created, error } = await supabase.from("community_profiles").insert({
-      ...data,
-      created_at: now,
-      updated_at: now,
-    }).select().single();
-    if (error) {
-      console.error("Supabase createCommunityProfile error:", error);
-      throw new Error(`Failed to create community profile: ${error.message}`);
+    try {
+      const { data: created, error } = await supabase.from("community_profiles").insert({
+        ...data,
+        created_at: now,
+        updated_at: now,
+      }).select().single();
+      if (!error && created) return { ...created, is_published: Boolean(created.is_published) };
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase createCommunityProfile error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase createCommunityProfile exception, falling back to SQLite:", e?.message || e);
     }
-    return { ...created, is_published: Boolean(created.is_published) };
   }
 
   const db = getDb();
@@ -2201,15 +2385,20 @@ export async function createCommunityProfile(data: Omit<CommunityProfile, "id" |
 export async function updateCommunityProfile(id: string, data: Partial<CommunityProfile>): Promise<CommunityProfile> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { data: updated, error } = await supabase.from("community_profiles").update({
-      ...data,
-      updated_at: new Date().toISOString(),
-    }).eq("id", id).select().single();
-    if (error) {
-      console.error("Supabase updateCommunityProfile error:", error);
-      throw new Error(`Failed to update profile: ${error.message}`);
+    try {
+      const { data: updated, error } = await supabase.from("community_profiles").update({
+        ...data,
+        updated_at: new Date().toISOString(),
+      }).eq("id", id).select().single();
+      if (!error && updated) return { ...updated, is_published: Boolean(updated.is_published) };
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase updateCommunityProfile error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase updateCommunityProfile exception, falling back to SQLite:", e?.message || e);
     }
-    return { ...updated, is_published: Boolean(updated.is_published) };
   }
 
   const db = getDb();
@@ -2251,12 +2440,17 @@ export async function updateCommunityProfile(id: string, data: Partial<Community
 export async function deleteCommunityProfile(id: string): Promise<boolean> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { error } = await supabase.from("community_profiles").delete().eq("id", id);
-    if (error) {
-      console.error("Supabase deleteCommunityProfile error:", error);
-      throw new Error(`Failed to delete profile: ${error.message}`);
+    try {
+      const { error } = await supabase.from("community_profiles").delete().eq("id", id);
+      if (!error) return true;
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase deleteCommunityProfile error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase deleteCommunityProfile exception, falling back to SQLite:", e?.message || e);
     }
-    return true;
   }
 
   const db = getDb();
@@ -2271,13 +2465,23 @@ export async function deleteCommunityProfile(id: string): Promise<boolean> {
 export async function getPageContent(key: string): Promise<PageContent | null> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    await ensureSupabaseSeeded(supabase);
-    const { data } = await supabase.from("page_content").select("*").eq("key", key).maybeSingle();
-    if (!data) return null;
-    return {
-      ...data,
-      metadata_json: typeof data.metadata_json === "string" ? JSON.parse(data.metadata_json) : data.metadata_json,
-    };
+    try {
+      await ensureSupabaseSeeded(supabase);
+      const { data, error } = await supabase.from("page_content").select("*").eq("key", key).maybeSingle();
+      if (!error && data) {
+        return {
+          ...data,
+          metadata_json: typeof data.metadata_json === "string" ? JSON.parse(data.metadata_json) : data.metadata_json,
+        };
+      }
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getPageContent error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getPageContent exception, falling back to SQLite:", e?.message || e);
+    }
   }
 
   const db = getDb();
@@ -2292,13 +2496,23 @@ export async function getPageContent(key: string): Promise<PageContent | null> {
 export async function getAllPageContents(): Promise<PageContent[]> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    await ensureSupabaseSeeded(supabase);
-    const { data, error } = await supabase.from("page_content").select("*").order("key", { ascending: true });
-    if (error) throw error;
-    return (data || []).map((r) => ({
-      ...r,
-      metadata_json: typeof r.metadata_json === "string" ? JSON.parse(r.metadata_json) : r.metadata_json,
-    }));
+    try {
+      await ensureSupabaseSeeded(supabase);
+      const { data, error } = await supabase.from("page_content").select("*").order("key", { ascending: true });
+      if (!error && data) {
+        return (data || []).map((r) => ({
+          ...r,
+          metadata_json: typeof r.metadata_json === "string" ? JSON.parse(r.metadata_json) : r.metadata_json,
+        }));
+      }
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getAllPageContents error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getAllPageContents exception, falling back to SQLite:", e?.message || e);
+    }
   }
 
   const db = getDb();
@@ -2308,6 +2522,7 @@ export async function getAllPageContents(): Promise<PageContent[]> {
     metadata_json: r.metadata_json ? JSON.parse(r.metadata_json) : null,
   }));
 }
+
 
 export async function updatePageContent(key: string, data: { title: string; subtitle?: string | null; content: string }): Promise<PageContent> {
   const now = new Date().toISOString();
@@ -2357,9 +2572,17 @@ export async function updatePageContent(key: string, data: { title: string; subt
 export async function getContactMessages(): Promise<ContactMessage[]> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { data, error } = await supabase.from("contact_messages").select("*").order("created_at", { ascending: false });
-    if (error) throw error;
-    return data || [];
+    try {
+      const { data, error } = await supabase.from("contact_messages").select("*").order("created_at", { ascending: false });
+      if (!error && data) return data;
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getContactMessages error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getContactMessages exception, falling back to SQLite:", e?.message || e);
+    }
   }
 
   const db = getDb();
@@ -2370,17 +2593,22 @@ export async function createContactMessage(data: { name: string; email: string; 
   const now = new Date().toISOString();
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { data: created, error } = await supabase.from("contact_messages").insert({
-      ...data,
-      status: "new",
-      created_at: now,
-      updated_at: now,
-    }).select().single();
-    if (error) {
-      console.error("Supabase createContactMessage error:", error);
-      throw new Error(`Failed to save contact message: ${error.message}`);
+    try {
+      const { data: created, error } = await supabase.from("contact_messages").insert({
+        ...data,
+        status: "new",
+        created_at: now,
+        updated_at: now,
+      }).select().single();
+      if (!error && created) return created;
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase createContactMessage error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase createContactMessage exception, falling back to SQLite:", e?.message || e);
     }
-    return created;
   }
 
   const db = getDb();
@@ -2403,15 +2631,20 @@ export async function updateContactMessage(id: string, data: { status?: string; 
   const now = new Date().toISOString();
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { data: updated, error } = await supabase.from("contact_messages").update({
-      ...data,
-      updated_at: now,
-    }).eq("id", id).select().single();
-    if (error) {
-      console.error("Supabase updateContactMessage error:", error);
-      throw new Error(`Failed to update message: ${error.message}`);
+    try {
+      const { data: updated, error } = await supabase.from("contact_messages").update({
+        ...data,
+        updated_at: now,
+      }).eq("id", id).select().single();
+      if (!error && updated) return updated;
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase updateContactMessage error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase updateContactMessage exception, falling back to SQLite:", e?.message || e);
     }
-    return updated;
   }
 
   const db = getDb();
@@ -2436,9 +2669,17 @@ export async function updateContactMessage(id: string, data: { status?: string; 
 export async function deleteContactMessage(id: string): Promise<boolean> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { error } = await supabase.from("contact_messages").delete().eq("id", id);
-    if (error) throw error;
-    return true;
+    try {
+      const { error } = await supabase.from("contact_messages").delete().eq("id", id);
+      if (!error) return true;
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase deleteContactMessage error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase deleteContactMessage exception, falling back to SQLite:", e?.message || e);
+    }
   }
 
   const db = getDb();
@@ -2453,9 +2694,17 @@ export async function deleteContactMessage(id: string): Promise<boolean> {
 export async function getJoinRequests(): Promise<JoinRequest[]> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { data, error } = await supabase.from("join_requests").select("*").order("created_at", { ascending: false });
-    if (error) throw error;
-    return data || [];
+    try {
+      const { data, error } = await supabase.from("join_requests").select("*").order("created_at", { ascending: false });
+      if (!error && data) return data;
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getJoinRequests error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getJoinRequests exception, falling back to SQLite:", e?.message || e);
+    }
   }
 
   const db = getDb();
@@ -2473,17 +2722,22 @@ export async function createJoinRequest(data: {
   const now = new Date().toISOString();
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { data: created, error } = await supabase.from("join_requests").insert({
-      ...data,
-      status: "new",
-      created_at: now,
-      updated_at: now,
-    }).select().single();
-    if (error) {
-      console.error("Supabase createJoinRequest error:", error);
-      throw new Error(`Failed to submit join request: ${error.message}`);
+    try {
+      const { data: created, error } = await supabase.from("join_requests").insert({
+        ...data,
+        status: "new",
+        created_at: now,
+        updated_at: now,
+      }).select().single();
+      if (!error && created) return created;
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase createJoinRequest error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase createJoinRequest exception, falling back to SQLite:", e?.message || e);
     }
-    return created;
   }
 
   const db = getDb();
@@ -2517,15 +2771,20 @@ export async function updateJoinRequest(id: string, data: { status?: string; pri
   const now = new Date().toISOString();
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { data: updated, error } = await supabase.from("join_requests").update({
-      ...data,
-      updated_at: now,
-    }).eq("id", id).select().single();
-    if (error) {
-      console.error("Supabase updateJoinRequest error:", error);
-      throw new Error(`Failed to update join request: ${error.message}`);
+    try {
+      const { data: updated, error } = await supabase.from("join_requests").update({
+        ...data,
+        updated_at: now,
+      }).eq("id", id).select().single();
+      if (!error && updated) return updated;
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase updateJoinRequest error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase updateJoinRequest exception, falling back to SQLite:", e?.message || e);
     }
-    return updated;
   }
 
   const db = getDb();
@@ -2550,9 +2809,17 @@ export async function updateJoinRequest(id: string, data: { status?: string; pri
 export async function deleteJoinRequest(id: string): Promise<boolean> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { error } = await supabase.from("join_requests").delete().eq("id", id);
-    if (error) throw error;
-    return true;
+    try {
+      const { error } = await supabase.from("join_requests").delete().eq("id", id);
+      if (!error) return true;
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase deleteJoinRequest error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase deleteJoinRequest exception, falling back to SQLite:", e?.message || e);
+    }
   }
 
   const db = getDb();
@@ -2602,8 +2869,17 @@ export async function logAdminActivity(
 export async function getAdminActivityLogs(limit = 50): Promise<AdminActivityLog[]> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { data } = await supabase.from("admin_activity_logs").select("*").order("created_at", { ascending: false }).limit(limit);
-    return data || [];
+    try {
+      const { data, error } = await supabase.from("admin_activity_logs").select("*").order("created_at", { ascending: false }).limit(limit);
+      if (!error && data) return data;
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getAdminActivityLogs error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getAdminActivityLogs exception, falling back to SQLite:", e?.message || e);
+    }
   }
 
   const db = getDb();
@@ -2613,51 +2889,56 @@ export async function getAdminActivityLogs(limit = 50): Promise<AdminActivityLog
 export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    await ensureSupabaseSeeded(supabase);
-    const now = new Date().toISOString();
-    const [
-      { count: totalEvents },
-      { count: publishedEvents },
-      { count: upcomingEvents },
-      { count: totalGalleryImages },
-      { count: publishedGalleryImages },
-      { count: activeAnnouncements },
-      { count: unreadMessages },
-      { count: pendingJoinRequests },
-    ] = await Promise.all([
-      supabase.from("events").select("*", { count: "exact", head: true }),
-      supabase.from("events").select("*", { count: "exact", head: true }).in("status", ["published", "past"]),
-      supabase.from("events").select("*", { count: "exact", head: true }).eq("status", "published").gte("start_date", now),
-      supabase.from("gallery_images").select("*", { count: "exact", head: true }),
-      supabase.from("gallery_images").select("*", { count: "exact", head: true }).eq("status", "published"),
-      supabase.from("announcements").select("*", { count: "exact", head: true }).eq("status", "published"),
-      supabase.from("contact_messages").select("*", { count: "exact", head: true }).eq("status", "new"),
-      supabase.from("join_requests").select("*", { count: "exact", head: true }).eq("status", "new"),
-    ]);
-
-    let totalResources = 0;
-    let publishedResources = 0;
     try {
-      const [{ count: totRes }, { count: pubRes }] = await Promise.all([
-        supabase.from("resources").select("*", { count: "exact", head: true }),
-        supabase.from("resources").select("*", { count: "exact", head: true }).eq("status", "published"),
+      await ensureSupabaseSeeded(supabase);
+      const now = new Date().toISOString();
+      const [
+        { count: totalEvents },
+        { count: publishedEvents },
+        { count: upcomingEvents },
+        { count: totalGalleryImages },
+        { count: publishedGalleryImages },
+        { count: activeAnnouncements },
+        { count: unreadMessages },
+        { count: pendingJoinRequests },
+      ] = await Promise.all([
+        supabase.from("events").select("*", { count: "exact", head: true }),
+        supabase.from("events").select("*", { count: "exact", head: true }).in("status", ["published", "past"]),
+        supabase.from("events").select("*", { count: "exact", head: true }).eq("status", "published").gte("start_date", now),
+        supabase.from("gallery_images").select("*", { count: "exact", head: true }),
+        supabase.from("gallery_images").select("*", { count: "exact", head: true }).eq("status", "published"),
+        supabase.from("announcements").select("*", { count: "exact", head: true }).eq("status", "published"),
+        supabase.from("contact_messages").select("*", { count: "exact", head: true }).eq("status", "new"),
+        supabase.from("join_requests").select("*", { count: "exact", head: true }).eq("status", "new"),
       ]);
-      totalResources = totRes || 0;
-      publishedResources = pubRes || 0;
-    } catch {}
 
-    return {
-      totalEvents: totalEvents || 0,
-      publishedEvents: publishedEvents || 0,
-      upcomingEvents: upcomingEvents || 0,
-      totalGalleryImages: totalGalleryImages || 0,
-      publishedGalleryImages: publishedGalleryImages || 0,
-      activeAnnouncements: activeAnnouncements || 0,
-      unreadMessages: unreadMessages || 0,
-      pendingJoinRequests: pendingJoinRequests || 0,
-      totalResources,
-      publishedResources,
-    };
+      let totalResources = 0;
+      let publishedResources = 0;
+      try {
+        const [{ count: totRes }, { count: pubRes }] = await Promise.all([
+          supabase.from("resources").select("*", { count: "exact", head: true }),
+          supabase.from("resources").select("*", { count: "exact", head: true }).eq("status", "published"),
+        ]);
+        totalResources = totRes || 0;
+        publishedResources = pubRes || 0;
+      } catch {}
+
+      return {
+        totalEvents: totalEvents || 0,
+        publishedEvents: publishedEvents || 0,
+        upcomingEvents: upcomingEvents || 0,
+        totalGalleryImages: totalGalleryImages || 0,
+        publishedGalleryImages: publishedGalleryImages || 0,
+        activeAnnouncements: activeAnnouncements || 0,
+        unreadMessages: unreadMessages || 0,
+        pendingJoinRequests: pendingJoinRequests || 0,
+        totalResources,
+        publishedResources,
+      };
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getDashboardMetrics exception, falling back to SQLite:", e?.message || e);
+    }
   }
 
   const db = getDb();
@@ -2728,25 +3009,34 @@ export async function authenticateAdmin(email: string, passwordPlain: string): P
 
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    await ensureSupabaseSeeded(supabase);
-    const { data: user } = await supabase.from("admin_users").select("*").eq("email", cleanEmail).eq("is_active", true).maybeSingle();
-    if (!user) return null;
+    try {
+      await ensureSupabaseSeeded(supabase);
+      const { data: user, error } = await supabase.from("admin_users").select("*").eq("email", cleanEmail).eq("is_active", true).maybeSingle();
+      if (!error && user) {
+        const valid = bcrypt.compareSync(passwordPlain, user.password_hash);
+        if (!valid) return null;
 
-    const valid = bcrypt.compareSync(passwordPlain, user.password_hash);
-    if (!valid) return null;
+        await supabase.from("admin_users").update({ last_login_at: now }).eq("id", user.id);
 
-    await supabase.from("admin_users").update({ last_login_at: now }).eq("id", user.id);
-
-    return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      is_active: Boolean(user.is_active),
-      last_login_at: now,
-      created_at: user.created_at,
-      updated_at: user.updated_at,
-    };
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          is_active: Boolean(user.is_active),
+          last_login_at: now,
+          created_at: user.created_at,
+          updated_at: user.updated_at,
+        };
+      }
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase authenticateAdmin error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase authenticateAdmin exception, falling back to SQLite:", e?.message || e);
+    }
   }
 
   const db = getDb();
@@ -2773,22 +3063,32 @@ export async function authenticateAdmin(email: string, passwordPlain: string): P
 export async function getAdminUserById(id: string): Promise<AdminUser | null> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    let { data: user } = await supabase.from("admin_users").select("*").eq("id", id).eq("is_active", true).maybeSingle();
-    if (!user) {
-      const { data: fallback } = await supabase.from("admin_users").select("*").eq("email", "admin@nepaliinkiit.org").eq("is_active", true).maybeSingle();
-      user = fallback;
+    try {
+      let { data: user, error } = await supabase.from("admin_users").select("*").eq("id", id).eq("is_active", true).maybeSingle();
+      if (!error && !user) {
+        const { data: fallback } = await supabase.from("admin_users").select("*").eq("email", "admin@nepaliinkiit.org").eq("is_active", true).maybeSingle();
+        user = fallback;
+      }
+      if (!error && user) {
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          is_active: Boolean(user.is_active),
+          last_login_at: user.last_login_at,
+          created_at: user.created_at,
+          updated_at: user.updated_at,
+        };
+      }
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getAdminUserById error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getAdminUserById exception, falling back to SQLite:", e?.message || e);
     }
-    if (!user) return null;
-    return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      is_active: Boolean(user.is_active),
-      last_login_at: user.last_login_at,
-      created_at: user.created_at,
-      updated_at: user.updated_at,
-    };
   }
 
   const db = getDb();
@@ -2813,18 +3113,28 @@ export async function getAdminUserByEmail(email: string): Promise<AdminUser | nu
   const cleanEmail = email.trim().toLowerCase();
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { data: user } = await supabase.from("admin_users").select("*").eq("email", cleanEmail).eq("is_active", true).maybeSingle();
-    if (!user) return null;
-    return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      is_active: Boolean(user.is_active),
-      last_login_at: user.last_login_at,
-      created_at: user.created_at,
-      updated_at: user.updated_at,
-    };
+    try {
+      const { data: user, error } = await supabase.from("admin_users").select("*").eq("email", cleanEmail).eq("is_active", true).maybeSingle();
+      if (!error && user) {
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          is_active: Boolean(user.is_active),
+          last_login_at: user.last_login_at,
+          created_at: user.created_at,
+          updated_at: user.updated_at,
+        };
+      }
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getAdminUserByEmail error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getAdminUserByEmail exception, falling back to SQLite:", e?.message || e);
+    }
   }
 
   const db = getDb();
@@ -2845,8 +3155,19 @@ export async function getAdminUserByEmail(email: string): Promise<AdminUser | nu
 export async function getAdminUsers(): Promise<AdminUser[]> {
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { data } = await supabase.from("admin_users").select("id, email, name, role, is_active, last_login_at, created_at, updated_at");
-    return (data || []).map((u) => ({ ...u, is_active: Boolean(u.is_active) }));
+    try {
+      const { data, error } = await supabase.from("admin_users").select("id, email, name, role, is_active, last_login_at, created_at, updated_at");
+      if (!error && data) {
+        return (data || []).map((u) => ({ ...u, is_active: Boolean(u.is_active) }));
+      }
+      if (error) {
+        if (isQuotaOrRestrictionError(error)) disableSupabaseService(error.message);
+        console.warn("Supabase getAdminUsers error, falling back to SQLite:", error.message);
+      }
+    } catch (e: any) {
+      if (isQuotaOrRestrictionError(e)) disableSupabaseService(e?.message || String(e));
+      console.warn("Supabase getAdminUsers exception, falling back to SQLite:", e?.message || e);
+    }
   }
 
   const db = getDb();

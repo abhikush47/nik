@@ -19,18 +19,55 @@ export const isSupabaseAdminConfigured = Boolean(
 
 let cachedClient: SupabaseClient | null = null;
 let cachedAdminClient: SupabaseClient | null = null;
+let supabaseDisabled = false;
 
-function fetchWithTimeout(url: any, opts: any) {
+export function isSupabaseServiceDisabled(): boolean {
+  return supabaseDisabled;
+}
+
+export function disableSupabaseService(reason?: string) {
+  if (!supabaseDisabled) {
+    console.warn(`[Supabase Service Disabled] ${reason || "Service restricted"}. Switching to SQLite database fallback.`);
+    supabaseDisabled = true;
+    cachedClient = null;
+    cachedAdminClient = null;
+  }
+}
+
+export function isQuotaOrRestrictionError(error: any): boolean {
+  if (!error) return false;
+  const msg = typeof error === "string" ? error : error.message || error.details || JSON.stringify(error);
+  return (
+    msg.includes("exceed_cached_egress_quota") ||
+    msg.includes("exceed_quota") ||
+    msg.includes("restricted due to the following violations") ||
+    msg.includes("402") ||
+    msg.includes("Payment Required")
+  );
+}
+
+async function fetchWithTimeout(url: any, opts: any) {
+  if (supabaseDisabled) {
+    throw new Error("Supabase is disabled due to quota restriction; using SQLite fallback.");
+  }
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), 8000);
-  return fetch(url, {
-    ...opts,
-    signal: controller.signal,
-  }).finally(() => clearTimeout(id));
+  try {
+    const res = await fetch(url, {
+      ...opts,
+      signal: controller.signal,
+    });
+    if (res.status === 402) {
+      disableSupabaseService("HTTP 402 Payment Required / Egress Quota Exceeded");
+    }
+    return res;
+  } finally {
+    clearTimeout(id);
+  }
 }
 
 export function getSupabase(): SupabaseClient | null {
-  if (!isSupabaseConfigured) return null;
+  if (supabaseDisabled || !isSupabaseConfigured) return null;
   if (!cachedClient) {
     try {
       cachedClient = createClient(supabaseUrl!, supabaseAnonKey!, {
@@ -46,7 +83,7 @@ export function getSupabase(): SupabaseClient | null {
 }
 
 export function getSupabaseAdmin(): SupabaseClient | null {
-  if (!isSupabaseAdminConfigured) return null;
+  if (supabaseDisabled || !isSupabaseAdminConfigured) return null;
   if (!cachedAdminClient) {
     try {
       cachedAdminClient = createClient(supabaseUrl!, supabaseServiceKey!, {
@@ -60,4 +97,5 @@ export function getSupabaseAdmin(): SupabaseClient | null {
   }
   return cachedAdminClient;
 }
+
 

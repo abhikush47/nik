@@ -12,6 +12,8 @@ export const metadata = {
   description: "Discover life as a Nepali student at KIIT University: cultural celebrations, peer mentorship, campus sports, and community guidelines.",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function CommunityPage() {
   const profiles = await getCommunityProfiles({ onlyPublished: true });
 

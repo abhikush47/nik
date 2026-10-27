@@ -17,6 +17,8 @@ interface EventPageProps {
   params: Promise<{ slug: string }>;
 }
 
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata({ params }: EventPageProps): Promise<Metadata> {
   const { slug } = await params;
   const event = await getEventBySlug(slug);

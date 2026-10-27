@@ -8,6 +8,8 @@ export const metadata = {
   description: "Get in touch with NEPALI IN KIIT student coordinators for event inquiries, volunteer opportunities, or general community support.",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function ContactPage() {
   const settings = await getSiteSettings();
 

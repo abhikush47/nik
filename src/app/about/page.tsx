@@ -8,6 +8,8 @@ export const metadata = {
   description: "Learn about the history, vision, and values uniting Nepali students at KIIT University, Bhubaneswar, Odisha.",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function AboutPage() {
   const [storyContent, valuesContent, profiles] = await Promise.all([
     getPageContent("about_our_story"),
