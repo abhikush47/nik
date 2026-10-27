@@ -132,6 +132,7 @@ export default function AdminAnnouncementsPage() {
     if (!confirm(`Are you sure you want to delete "${title}"?`)) return;
     setActionLoading(true);
     setError(null);
+    setItems((prev) => prev.filter((item) => item.id !== id));
     try {
       const res = await fetch(`/api/admin/announcements/${id}`, { method: "DELETE" });
       const data = await res.json().catch(() => ({}));
@@ -142,6 +143,7 @@ export default function AdminAnnouncementsPage() {
       await fetchItems();
     } catch (err: any) {
       setError(err.message || "Failed to delete announcement");
+      await fetchItems();
     } finally {
       setActionLoading(false);
     }
@@ -150,6 +152,9 @@ export default function AdminAnnouncementsPage() {
   const toggleMarquee = async (item: Announcement) => {
     try {
       setError(null);
+      setItems((prev) =>
+        prev.map((a) => (a.id === item.id ? { ...a, marquee_enabled: !a.marquee_enabled } : a))
+      );
       const res = await fetch(`/api/admin/announcements/${item.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -162,6 +167,7 @@ export default function AdminAnnouncementsPage() {
       fetchItems();
     } catch (err: any) {
       setError(err.message || "Failed to update marquee status");
+      fetchItems();
     }
   };
 

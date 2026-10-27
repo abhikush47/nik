@@ -341,11 +341,13 @@ export default function AdminResourcesPage() {
   // Delete resource
   const executeDelete = async () => {
     if (!deleteConfirmItem) return;
+    const targetId = deleteConfirmItem.id;
     setActionLoading(true);
     setError(null);
+    setResources((prev) => prev.filter((r) => r.id !== targetId));
 
     try {
-      const res = await fetch(`/api/admin/resources/${deleteConfirmItem.id}`, {
+      const res = await fetch(`/api/admin/resources/${targetId}`, {
         method: "DELETE",
       });
       const data = await res.json();
@@ -357,6 +359,7 @@ export default function AdminResourcesPage() {
       await fetchData();
     } catch (err: any) {
       setError(err.message || "Failed to delete resource");
+      await fetchData();
     } finally {
       setActionLoading(false);
     }

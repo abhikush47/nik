@@ -109,6 +109,7 @@ export default function AdminCommunityPage() {
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to delete profile "${name}"?`)) return;
     setError(null);
+    setProfiles((prev) => prev.filter((p) => p.id !== id));
     try {
       const res = await fetch(`/api/admin/community/${id}`, { method: "DELETE" });
       const data = await res.json().catch(() => ({}));
@@ -119,6 +120,7 @@ export default function AdminCommunityPage() {
       fetchProfiles();
     } catch (err: any) {
       setError(err.message || "Failed to delete profile");
+      fetchProfiles();
     }
   };
 

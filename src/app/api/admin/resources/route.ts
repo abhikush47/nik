@@ -5,6 +5,7 @@ import { isValidGoogleDriveUrl, detectGoogleDriveType } from "@/lib/validation";
 import { revalidateWebsite } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET() {
   try {
@@ -13,7 +14,16 @@ export async function GET() {
       getResources(), // fetches all including drafts
       getResourceCategories(),
     ]);
-    return NextResponse.json({ resources, categories });
+    return NextResponse.json(
+      { resources, categories },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      }
+    );
   } catch (err: any) {
     if (err.message === "UNAUTHORIZED") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

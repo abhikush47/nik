@@ -49,7 +49,7 @@ export default function AdminEventsPage() {
 
   const fetchItems = async () => {
     try {
-      const res = await fetch("/api/admin/events");
+      const res = await fetch(`/api/admin/events?_t=${Date.now()}`, { cache: "no-store" });
       const data = await res.json();
       if (res.ok && data.items) {
         setItems(data.items);
@@ -196,6 +196,7 @@ export default function AdminEventsPage() {
     if (!confirm(`Are you sure you want to delete event "${title}"?`)) return;
     setActionLoading(true);
     setError(null);
+    setItems((prev) => prev.filter((item) => item.id !== id));
     try {
       const res = await fetch(`/api/admin/events/${id}`, { method: "DELETE" });
       const data = await res.json().catch(() => ({}));
@@ -206,6 +207,7 @@ export default function AdminEventsPage() {
       await fetchItems();
     } catch (err: any) {
       setError(err.message || "Failed to delete event");
+      await fetchItems();
     } finally {
       setActionLoading(false);
     }
@@ -214,6 +216,9 @@ export default function AdminEventsPage() {
   const toggleFeatured = async (item: EventItem) => {
     try {
       setError(null);
+      setItems((prev) =>
+        prev.map((e) => (e.id === item.id ? { ...e, featured: !e.featured } : e))
+      );
       const res = await fetch(`/api/admin/events/${item.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -226,6 +231,7 @@ export default function AdminEventsPage() {
       fetchItems();
     } catch (err: any) {
       setError(err.message || "Failed to update featured status");
+      fetchItems();
     }
   };
 

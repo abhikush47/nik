@@ -305,6 +305,11 @@ function initSQLiteSchema(db: Database.Database) {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS _system_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
 
   seedSQLiteInitialData(db);
@@ -498,6 +503,13 @@ const SEED_PAGE_CONTENTS = [
 ];
 
 function seedSQLiteInitialData(db: Database.Database) {
+  // Check if system metadata records initial seed as completed
+  const meta = db.prepare("SELECT value FROM _system_meta WHERE key = 'initial_seed_completed'").get() as { value: string } | undefined;
+  if (meta && meta.value === "true") {
+    // Database has already been initialized. NEVER re-insert deleted records.
+    return;
+  }
+
   const now = new Date().toISOString();
 
   // 1. Admin user seed
@@ -666,6 +678,9 @@ function seedSQLiteInitialData(db: Database.Database) {
       `).run(c.id, c.name, c.slug, c.description, c.display_order, now);
     }
   }
+
+  // Record that initial seeding is completed so future user deletions are permanently respected
+  db.prepare("INSERT OR REPLACE INTO _system_meta (key, value) VALUES ('initial_seed_completed', 'true')").run();
 }
 
 // ==============================================================================
@@ -1756,19 +1771,7 @@ export async function getResourceCategories(): Promise<ResourceCategory[]> {
   }
 
   const db = getDb();
-  const rows = db.prepare("SELECT * FROM resource_categories ORDER BY display_order ASC").all() as ResourceCategory[];
-  if (rows.length === 0) {
-    // Auto-seed in SQLite if empty
-    const now = new Date().toISOString();
-    for (const c of SEED_RESOURCE_CATEGORIES) {
-      db.prepare(`
-        INSERT OR IGNORE INTO resource_categories (id, name, slug, description, display_order, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(c.id, c.name, c.slug, c.description, c.display_order, now);
-    }
-    return db.prepare("SELECT * FROM resource_categories ORDER BY display_order ASC").all() as ResourceCategory[];
-  }
-  return rows;
+  return db.prepare("SELECT * FROM resource_categories ORDER BY display_order ASC").all() as ResourceCategory[];
 }
 
 export async function createResourceCategory(name: string, slug?: string, description?: string): Promise<ResourceCategory> {
