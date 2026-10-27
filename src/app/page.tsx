@@ -12,6 +12,7 @@ import {
   BookOpen,
   ChevronRight,
   Shield,
+  GraduationCap,
   Folder,
   FolderArchive,
   ExternalLink,

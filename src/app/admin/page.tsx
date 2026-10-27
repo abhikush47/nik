@@ -104,10 +104,10 @@ export default async function AdminDashboardPage() {
           </div>
           <div>
             <p className="text-2xl sm:text-3xl font-black text-gray-900 font-display">
-              {metrics.totalAnnouncements ?? 0}
+              {metrics.activeAnnouncements}
             </p>
             <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">
-              {metrics.activeAnnouncements ?? 0} Active Notices
+              Active Bulletins
             </p>
           </div>
           <Link

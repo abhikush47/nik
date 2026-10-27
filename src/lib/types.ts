@@ -183,6 +183,7 @@ export interface DashboardMetrics {
   totalGalleryImages: number;
   publishedGalleryImages: number;
   activeAnnouncements: number;
+  totalAnnouncements?: number;
   unreadMessages: number;
   pendingJoinRequests: number;
   totalResources?: number;
