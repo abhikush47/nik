@@ -8,6 +8,11 @@
 
 const fs = require("fs");
 const path = require("path");
+
+if (typeof global.WebSocket === "undefined") {
+  global.WebSocket = class DummyWebSocket {};
+}
+
 const Database = require("better-sqlite3");
 const { createClient } = require("@supabase/supabase-js");
 
