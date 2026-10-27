@@ -31,7 +31,6 @@ const NAV_ITEMS = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/announcements", label: "Announcements", icon: Megaphone },
   { href: "/admin/events", label: "Events Manager", icon: Calendar },
-  { href: "/admin/gallery", label: "Gallery Photos", icon: ImageIcon },
   { href: "/admin/resources", label: "Resources Hub", icon: FolderOpen },
   { href: "/admin/messages", label: "Inquiries & Requests", icon: MessageSquare },
   { href: "/admin/community", label: "Community Wings", icon: Users },

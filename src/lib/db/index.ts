@@ -333,74 +333,7 @@ const SEED_CATEGORIES = [
   { id: "00000000-0000-0000-0000-000000000016", name: "Behind The Scenes", slug: "memories", description: "Preparations, stage decoration, rehearsals, and candid moments", display_order: 6 },
 ];
 
-const SEED_GALLERY_IMAGES = [
-  {
-    id: "00000000-0000-0000-0000-000000000021",
-    title: "Grand Dashain Community Gathering",
-    alt_text: "Nepali students celebrating Dashain together at KIIT with traditional attire and smiles",
-    category_slug: "dashain",
-    image_url: "/images/community/dashain-together.png",
-    photographer_credit: "NIK Media Team",
-    featured: true,
-    display_order: 1,
-    status: "published",
-  },
-  {
-    id: "00000000-0000-0000-0000-000000000022",
-    title: "Campus Cultural Festival Experience",
-    alt_text: "Nepali festival cultural showcase and stage performances on campus",
-    category_slug: "cultural-celebrations",
-    image_url: "/images/community/festival-experience.png",
-    photographer_credit: "NIK Media Team",
-    featured: true,
-    display_order: 2,
-    status: "published",
-  },
-  {
-    id: "00000000-0000-0000-0000-000000000023",
-    title: "Nepali Heritage Meets KIIT Campus",
-    alt_text: "Nepali students proudly representing heritage on the KIIT University campus grounds",
-    category_slug: "student-life",
-    image_url: "/images/community/heritage-campus.png",
-    photographer_credit: "NIK Photography",
-    featured: true,
-    display_order: 3,
-    status: "published",
-  },
-  {
-    id: "00000000-0000-0000-0000-000000000024",
-    title: "Festival Campus Celebration & Unity",
-    alt_text: "Group celebration of Nepali festival traditions in Bhubaneswar",
-    category_slug: "cultural-celebrations",
-    image_url: "/images/community/campus-celebration.png",
-    photographer_credit: "NIK Volunteer",
-    featured: true,
-    display_order: 4,
-    status: "published",
-  },
-  {
-    id: "00000000-0000-0000-0000-000000000025",
-    title: "Dashain Talent Showcase & Acoustic Session",
-    alt_text: "Poster and visual memory of Nepali musical talent showcase at KIIT",
-    category_slug: "dashain",
-    image_url: "/images/community/talent-showcase.png",
-    photographer_credit: "NIK Arts Committee",
-    featured: true,
-    display_order: 5,
-    status: "published",
-  },
-  {
-    id: "00000000-0000-0000-0000-000000000026",
-    title: "KIIT Campus 6 Front Gate & Landmark",
-    alt_text: "Campus 6 front gate where Nepali students meet and attend daily classes",
-    category_slug: "student-life",
-    image_url: "/images/community/kiit-gate.jpg",
-    photographer_credit: "Campus Photography",
-    featured: false,
-    display_order: 6,
-    status: "published",
-  },
-];
+const SEED_GALLERY_IMAGES: any[] = [];
 
 const SEED_EVENTS = [
   {
@@ -698,31 +631,7 @@ function seedSQLiteInitialData(db: Database.Database) {
     }
   }
 
-  // 6. Gallery Images seed
-  const imgCount = db.prepare("SELECT COUNT(*) as count FROM gallery_images").get() as { count: number };
-  if (!imgCount || imgCount.count === 0) {
-    for (const img of SEED_GALLERY_IMAGES) {
-      db.prepare(`
-        INSERT INTO gallery_images (
-          id, title, alt_text, category_slug, image_url,
-          photographer_credit, status, featured, display_order,
-          created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        img.id,
-        img.title,
-        img.alt_text,
-        img.category_slug,
-        img.image_url,
-        img.photographer_credit,
-        img.status,
-        img.featured ? 1 : 0,
-        img.display_order,
-        now,
-        now
-      );
-    }
-  }
+  // 6. Gallery Images seed (Disabled - gallery removed)
 
   // 7. Community Profiles seed
   const profCount = db.prepare("SELECT COUNT(*) as count FROM community_profiles").get() as { count: number };

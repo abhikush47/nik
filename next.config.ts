@@ -24,6 +24,20 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: "/gallery",
+        destination: "/resources",
+        permanent: true,
+      },
+      {
+        source: "/admin/gallery",
+        destination: "/admin/resources",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

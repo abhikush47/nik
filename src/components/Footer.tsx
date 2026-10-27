@@ -60,11 +60,6 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/gallery" className="hover:text-white transition-colors">
-                  Community Gallery
-                </Link>
-              </li>
-              <li>
                 <Link href="/resources" className="hover:text-white transition-colors">
                   Resources Hub
                 </Link>

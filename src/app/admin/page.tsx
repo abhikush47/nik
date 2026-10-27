@@ -55,11 +55,11 @@ export default async function AdminDashboardPage() {
             <span>New Event</span>
           </Link>
           <Link
-            href="/admin/gallery"
+            href="/admin/resources"
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Upload Photo</span>
+            <span>New Resource</span>
           </Link>
           <Link
             href="/admin/announcements"
@@ -96,25 +96,25 @@ export default async function AdminDashboardPage() {
           </Link>
         </div>
 
-        {/* Gallery Metric */}
+        {/* Announcements Metric */}
         <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-3">
           <div className="flex items-center justify-between text-gray-500">
-            <span className="text-xs font-bold uppercase tracking-wider">Photographs</span>
-            <ImageIcon className="w-4 h-4 text-emerald-600" />
+            <span className="text-xs font-bold uppercase tracking-wider">Notices</span>
+            <Megaphone className="w-4 h-4 text-emerald-600" />
           </div>
           <div>
             <p className="text-2xl sm:text-3xl font-black text-gray-900 font-display">
-              {metrics.totalGalleryImages}
+              {metrics.totalAnnouncements ?? 0}
             </p>
-            <p className="text-[11px] text-gray-500 mt-0.5">
-              {metrics.publishedGalleryImages} Published
+            <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">
+              {metrics.activeAnnouncements ?? 0} Active Notices
             </p>
           </div>
           <Link
-            href="/admin/gallery"
+            href="/admin/announcements"
             className="text-[11px] font-bold text-[#0B3D2E] hover:underline flex items-center gap-1 pt-1"
           >
-            <span>Manage Photos</span>
+            <span>Manage Notices</span>
             <ArrowRight className="w-3 h-3" />
           </Link>
         </div>

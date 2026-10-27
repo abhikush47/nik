@@ -227,16 +227,16 @@ export default async function EventDetailPage({ params }: EventPageProps) {
                 <div className="space-y-3">
                   <p className="text-xs text-gray-600 leading-relaxed">
                     {!isUpcoming
-                      ? "This event has already concluded. Photographs are archived in the gallery."
+                      ? "This event has already concluded. Drive materials and media are archived in the resources hub."
                       : deadlinePassed
                       ? `Registration is closed. The deadline passed on ${formattedDeadline}.`
                       : "Registrations are currently closed or by direct coordinator invitation."}
                   </p>
                   <Link
-                    href="/gallery"
+                    href="/resources"
                     className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold transition-all"
                   >
-                    <span>Browse Event Photos</span>
+                    <span>Browse Community Resources</span>
                   </Link>
                 </div>
               )}

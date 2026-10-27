@@ -12,12 +12,15 @@ import {
   BookOpen,
   ChevronRight,
   Shield,
-  GraduationCap,
+  Folder,
+  FolderArchive,
+  ExternalLink,
 } from "lucide-react";
 import {
   getSiteSettings,
   getUpcomingEvents,
-  getFeaturedGalleryImages,
+  getResources,
+  getResourceCategories,
   getAnnouncements,
 } from "@/lib/db";
 import HimalayanHeroCanvas from "@/components/HimalayanHeroCanvas";
@@ -25,15 +28,17 @@ import HimalayanHeroCanvas from "@/components/HimalayanHeroCanvas";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [settings, upcomingEvents, galleryImages, announcements] = await Promise.all([
+  const [settings, upcomingEvents, resources, categories, announcements] = await Promise.all([
     getSiteSettings(),
     getUpcomingEvents(),
-    getFeaturedGalleryImages(),
+    getResources({ onlyPublished: true }),
+    getResourceCategories(),
     getAnnouncements({ onlyPublished: true }),
   ]);
 
   const recentAnnouncements = announcements.slice(0, 3);
   const nextEvents = upcomingEvents.slice(0, 3);
+  const featuredResources = resources.slice(0, 4);
 
   return (
     <div className="space-y-20 sm:space-y-28 lg:space-y-32 pb-24 overflow-x-hidden">
@@ -195,120 +200,122 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* 3. SECTION B: COMMUNITY-MEMORY GALLERY PREVIEW (Photo-First Mosaic) */}
+      {/* 3. SECTION B: COMMUNITY DIGITAL RESOURCES & SHARED ARCHIVES */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 sm:mb-12">
           <div>
             <span className="text-xs font-bold uppercase tracking-widest text-[#087F4F]">
-              Visual Memories
+              Digital Library & Drives
             </span>
             <h2 className="text-2xl sm:text-4xl font-extrabold text-[#17231B] font-display mt-1">
-              Moments That Bring Us Together
+              Community Resources & Archives
             </h2>
             <p className="text-xs sm:text-sm text-gray-600 mt-1 max-w-xl">
-              Authentic glimpses of festivals, campus smiles, and gatherings captured across Bhubaneswar.
+              Shared Google Drive folders, event memories, official circulars, and study archives organized for Nepali students.
             </p>
           </div>
           <Link
-            href="/gallery"
+            href="/resources"
             className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#0B3D2E] hover:text-[#087F4F] transition-colors"
           >
-            <span>Explore Full Gallery</span>
+            <span>Explore All Resources</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
 
-        {galleryImages.length === 0 ? (
-          <div className="p-12 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-            <Sparkles className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-            <p className="text-sm text-gray-600 font-medium">Gallery moments will appear here soon.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-5 sm:gap-6">
-            {/* Dominant Asymmetric Lead Photograph (Spans 7 columns on lg) */}
-            {galleryImages[0] && (
-              <div className="sm:col-span-2 lg:col-span-7">
-                <Link
-                  href="/gallery"
-                  className="group relative block h-72 sm:h-96 lg:h-[440px] rounded-3xl overflow-hidden shadow-xs hover:shadow-xl transition-all duration-500 border border-gray-200/80 bg-gray-900"
-                >
-                  <Image
-                    src={galleryImages[0].image_url}
-                    alt={galleryImages[0].alt_text || galleryImages[0].title}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-                    sizes="(max-width: 1024px) 100vw, 60vw"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent opacity-90 group-hover:opacity-100 transition-opacity" />
-                  <div className="absolute bottom-5 inset-x-5 text-white z-10 space-y-1.5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-800/40 inline-block">
-                      {galleryImages[0].category_slug.replace("-", " ")}
-                    </span>
-                    <h3 className="text-lg sm:text-2xl font-bold text-white group-hover:text-emerald-200 transition-colors font-display">
-                      {galleryImages[0].title}
-                    </h3>
-                    <p className="text-xs text-gray-300 line-clamp-1">
-                      {galleryImages[0].alt_text || "A cherished moment from the NIK community."}
-                    </p>
-                  </div>
-                </Link>
+        {/* Category Folders Quick-Access Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-8">
+          {categories.slice(0, 6).map((cat) => (
+            <Link
+              key={cat.id}
+              href={`/resources?category=${encodeURIComponent(cat.name)}`}
+              className="group p-4 rounded-2xl bg-white border border-gray-200/80 hover:border-emerald-500 hover:shadow-md transition-all flex flex-col justify-between space-y-3"
+            >
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-[#0B3D2E] group-hover:bg-[#0B3D2E] group-hover:text-white transition-colors flex items-center justify-center">
+                <Folder className="w-4 h-4" />
               </div>
-            )}
+              <div>
+                <h3 className="text-xs sm:text-sm font-bold text-gray-900 group-hover:text-[#0B3D2E] transition-colors line-clamp-1">
+                  {cat.name}
+                </h3>
+                <p className="text-[11px] text-gray-500 line-clamp-1 mt-0.5">
+                  {cat.description || "Shared folder"}
+                </p>
+              </div>
+            </Link>
+          ))}
+        </div>
 
-            {/* Complementary Photos (Spans 5 columns on lg) */}
-            <div className="sm:col-span-2 lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-5 sm:gap-6">
-              {galleryImages.slice(1, 3).map((img) => (
-                <Link
-                  key={img.id}
-                  href="/gallery"
-                  className="group relative block h-56 sm:h-44 lg:h-[207px] rounded-2xl overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 border border-gray-200/70 bg-gray-900"
-                >
-                  <Image
-                    src={img.image_url}
-                    alt={img.alt_text || img.title}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-500"
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 40vw"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent opacity-85 group-hover:opacity-95 transition-opacity" />
-                  <div className="absolute bottom-3.5 inset-x-3.5 text-white z-10">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-300">
-                      {img.category_slug.replace("-", " ")}
+        {/* Featured Live Resources Cards */}
+        {featuredResources.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {featuredResources.map((res) => (
+              <div
+                key={res.id}
+                className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-2xs hover:shadow-md hover:border-emerald-300 transition-all flex flex-col justify-between space-y-4"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-50 text-[#0B3D2E] border border-emerald-200/60">
+                      <Folder className="w-3 h-3" />
+                      {res.category}
                     </span>
-                    <h3 className="text-sm font-bold text-white group-hover:text-emerald-200 transition-colors line-clamp-1">
-                      {img.title}
-                    </h3>
+                    <span className="text-[10px] text-gray-400 font-medium">
+                      {res.resource_type}
+                    </span>
                   </div>
-                </Link>
-              ))}
-            </div>
 
-            {/* Bottom Row Strip (Images 4, 5, 6) */}
-            {galleryImages.slice(3, 6).map((img) => (
-              <div key={img.id} className="lg:col-span-4">
-                <Link
-                  href="/gallery"
-                  className="group relative block h-60 sm:h-64 rounded-2xl overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 border border-gray-200/70 bg-gray-900"
-                >
-                  <Image
-                    src={img.image_url}
-                    alt={img.alt_text || img.title}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-500"
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent opacity-85 group-hover:opacity-95 transition-opacity" />
-                  <div className="absolute bottom-3.5 inset-x-3.5 text-white z-10">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-300">
-                      {img.category_slug.replace("-", " ")}
-                    </span>
-                    <h3 className="text-sm font-bold text-white group-hover:text-emerald-200 transition-colors line-clamp-1">
-                      {img.title}
-                    </h3>
-                  </div>
-                </Link>
+                  <h3 className="text-base font-bold text-gray-900 font-display leading-snug">
+                    {res.title}
+                  </h3>
+
+                  {res.description && (
+                    <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">
+                      {res.description}
+                    </p>
+                  )}
+
+                  {res.tags && res.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {res.tags.slice(0, 3).map((tag, idx) => (
+                        <span
+                          key={idx}
+                          className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-md"
+                        >
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
+                  <span className="text-[11px] text-gray-400">Google Drive Archive</span>
+                  <a
+                    href={res.drive_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0B3D2E] hover:text-emerald-700 transition-colors"
+                  >
+                    <span>Open Drive</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
               </div>
             ))}
+          </div>
+        ) : (
+          <div className="p-8 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+            <FolderArchive className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+            <p className="text-xs sm:text-sm text-gray-600 font-medium">
+              Digital resources and drive folders will appear here as they are published.
+            </p>
+            <Link
+              href="/resources"
+              className="inline-block mt-3 text-xs font-bold text-[#0B3D2E] hover:underline"
+            >
+              Browse Digital Library Hub →
+            </Link>
           </div>
         )}
       </section>

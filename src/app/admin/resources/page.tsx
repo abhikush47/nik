@@ -86,7 +86,7 @@ export default function AdminResourcesPage() {
     cover_image_url: "",
     related_event: "",
     event_date: "",
-    status: "draft" as "published" | "draft" | "archived",
+    status: "published" as "published" | "draft" | "archived",
     display_order: 0,
     featured: false,
   });
@@ -125,7 +125,7 @@ export default function AdminResourcesPage() {
       cover_image_url: "",
       related_event: "",
       event_date: "",
-      status: "draft",
+      status: "published",
       display_order: 0,
       featured: false,
     });
