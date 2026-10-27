@@ -46,3 +46,9 @@ data/*.db*
 data/*.db-wal
 data/*.db-shm
 
+# opennext and cloudflare
+/.open-next/
+.wrangler/
+.dev.vars
+
+
